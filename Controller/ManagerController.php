@@ -48,7 +48,7 @@ class ManagerController extends Controller
      */
     public function indexAction(Request $request)
     {
-        $queryParameters = array_merge($request->query->all(), [$request->get('_locale')]);
+        $queryParameters = array_merge($request->query->all(), ['_locale' => $request->get('_locale')]);
         $translator = $this->get('translator');
         $isJson = $request->get('json') ? true : false;
         if ($isJson) {
@@ -208,7 +208,7 @@ class ManagerController extends Controller
     public function renameFileAction(Request $request, $fileName)
     {
         $translator = $this->get('translator');
-        $queryParameters = array_merge($request->query->all(), [$request->get('_locale')]);
+        $queryParameters = array_merge($request->query->all(), ['_locale' => $request->get('_locale')]);
         $formRename = $this->createRenameForm();
         /* @var Form $formRename */
         $formRename->handleRequest($request);
@@ -314,7 +314,7 @@ class ManagerController extends Controller
     {
         $form = $this->createDeleteForm();
         $form->handleRequest($request);
-        $queryParameters = array_merge($request->query->all(), [$request->get('_locale')]);
+        $queryParameters = array_merge($request->query->all(), ['_locale' => $request->get('_locale')]);
         if ($form->isSubmitted() && $form->isValid()) {
             // remove file
             $fileManager = $this->newFileManager($queryParameters);
