@@ -1,5 +1,6 @@
 {% form_theme form 'bootstrap_3_layout.html.twig' %}
 {% form_theme formRename 'bootstrap_3_layout.html.twig' %}
+{% set locale = app.request.locale %}
 <!doctype html>
 <html lang="en" id="dropzone">
 <head>
@@ -22,7 +23,7 @@
 <div class="container-fluid ">
     <div class="row top-bar" id="top-bar">
         <a type="button" title="{{ 'button.tree'|trans }}"
-           href="{{ path('file_manager', fileManager.queryParameters|merge({'tree': fileManager.tree == true ? 0 : 1 })) }}"
+           href="{{ path('file_manager', fileManager.queryParameters|merge({'tree': (fileManager.tree == true ? 0 : 1), '_locale': locale })) }}"
            class="btn btn-sm btn-default {{ fileManager.tree ? 'active' }}">
             <span class="fa fa-navicon"></span>
         </a>
@@ -41,7 +42,7 @@
             <i class="glyphicon glyphicon-file"></i>
             <span>{{ 'button.add.files'|trans }}</span>
             <input id="fileupload" type="file"
-                   data-url="{{ path('file_manager_upload', fileManager.queryParameters) }}"
+                   data-url="{{ path('file_manager_upload', fileManager.queryParameters|merge{ '_locale': locale }) }}"
                    name="files[]" multiple=""
                    accept="{{ fileManager.configuration.accept is defined ? fileManager.configuration.accept : (fileManager.type ? accept(fileManager.type)) }}">
         </span>
@@ -59,7 +60,7 @@
                     data-target="#js-confirm-delete"
                     data-placement="left"
                     data-html="true"
-                    data-href='{{ path('file_manager_delete', fileManager.queryParameters) }}'>
+                    data-href='{{ path('file_manager_delete', fileManager.queryParameters|merge{'_locale': locale}) }}'>
                 <i class="glyphicon glyphicon-remove"></i>
                 <span>{{ 'button.delete.current'|trans }}</span>
             </button>
@@ -71,11 +72,11 @@
                 {{ order(fileManager, 'size') }}
                 {{ order(fileManager, 'dimension') }}
             {% endif %}
-            <a type="button" href="{{ path('file_manager', fileManager.queryParameters|merge({'view':"list"})) }}"
+            <a type="button" href="{{ path('file_manager', fileManager.queryParameters|merge({'view':"list", '_locale': locale})) }}"
                class="btn btn-sm btn-default {{ fileManager.view == 'list' ? 'active' }}">
                 <span class="fa fa-th-list"></span>
             </a>
-            <a type="button" href="{{ path('file_manager', fileManager.queryParameters|merge({'view':'thumbnail'})) }}"
+            <a type="button" href="{{ path('file_manager', fileManager.queryParameters|merge({'view':'thumbnail', '_locale': locale})) }}"
                class="btn btn-sm btn-default {{ fileManager.view == 'thumbnail' ? 'active' }}">
                 <span class="fa fa-th"></span>
             </a>
@@ -114,8 +115,8 @@
     var tree = {{ fileManager.tree ? 'true' : 'false' }}
     var moduleName = '{{ fileManager.module ? fileManager.module : 0 }}';
     var successMessage = '{{ 'file.add.success'|trans }}';
-    var url = "{{ path('file_manager', fileManager.queryParameters|merge({'json':true}))|e('js') }}"
-    var urldelete = "{{ path('file_manager_delete', fileManager.queryParameters )|e('js') }}"
+    var url = "{{ path('file_manager', fileManager.queryParameters|merge({'json':true, '_locale': locale}))|e('js') }}"
+    var urldelete = "{{ path('file_manager_delete', fileManager.queryParameters|merge{'_locale': locale} )|e('js') }}"
     var deleteMessage = "{{ 'title.delete'|trans }}"
     var renameMessage = "{{ 'title.rename.file'|trans }}"
     var downloadMessage = "{{ 'title.download'|trans }}"
