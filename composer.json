@@ -1,5 +1,5 @@
 {
-  "name": "artgris/filemanager-bundle",
+  "name": "fsd/filemanager-bundle",
   "type": "symfony-bundle",
   "description": "FileManager is a simple Multilingual File Manager Bundle for Symfony",
   "keywords": [
