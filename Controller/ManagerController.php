@@ -38,7 +38,7 @@ class ManagerController extends Controller
     protected $fileManager;
 
     /**
-     * @Route("/{_locale}/backend/file/manager", name="file_manager")
+     * @Route("/{_locale}/backend/file/manager", name="file_manager", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
      *
@@ -196,7 +196,7 @@ class ManagerController extends Controller
     }
 
     /**
-     * @Route("/{_locale}/backend/file/manager/rename/{fileName}", name="file_manager_rename")
+     * @Route("/{_locale}/backend/file/manager/rename/{fileName}", name="file_manager_rename", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
      * @param $fileName
@@ -241,7 +241,7 @@ class ManagerController extends Controller
     }
 
     /**
-     * @Route("/{_locale}/backend/file/manager/upload/", name="file_manager_upload")
+     * @Route("/{_locale}/backend/file/manager/upload/", name="file_manager_upload", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
      *
@@ -284,7 +284,7 @@ class ManagerController extends Controller
     }
 
     /**
-     * @Route("/{_locale}/backend/file/manager/file/{fileName}", name="file_manager_file")
+     * @Route("/{_locale}/backend/file/manager/file/{fileName}", name="file_manager_file", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
      * @param $fileName
@@ -301,7 +301,7 @@ class ManagerController extends Controller
     }
 
     /**
-     * @Route("/{_locale}/backend/file/manager/delete/", name="file_manager_delete")
+     * @Route("/{_locale}/backend/file/manager/delete/", name="file_manager_delete", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
      * @Method("DELETE")
