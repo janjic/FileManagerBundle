@@ -38,7 +38,7 @@ class ManagerController extends Controller
     protected $fileManager;
 
     /**
-     * @Route("/", name="file_manager")
+     * @Route("/{_locale}/backend/file/manager", name="file_manager")
      *
      * @param Request $request
      *
@@ -502,7 +502,7 @@ class ManagerController extends Controller
     private function newFileManager($queryParameters)
     {
         if (!isset($queryParameters['conf'])) {
-            throw new \RuntimeException('Please define a conf parameter in your route');
+            $queryParameters['conf'] = 'default';
         }
         $webDir = $this->getParameter('artgris_file_manager')['web_dir'];
 
