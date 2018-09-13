@@ -42,7 +42,7 @@
             <i class="glyphicon glyphicon-file"></i>
             <span>{{ 'button.add.files'|trans }}</span>
             <input id="fileupload" type="file"
-                   data-url="{{ path('file_manager_upload', fileManager.queryParameters|merge{ '_locale': locale }) }}"
+                   data-url="{{ path('file_manager_upload', fileManager.queryParameters|merge({ '_locale': locale })) }}"
                    name="files[]" multiple=""
                    accept="{{ fileManager.configuration.accept is defined ? fileManager.configuration.accept : (fileManager.type ? accept(fileManager.type)) }}">
         </span>
@@ -60,7 +60,7 @@
                     data-target="#js-confirm-delete"
                     data-placement="left"
                     data-html="true"
-                    data-href='{{ path('file_manager_delete', fileManager.queryParameters|merge{'_locale': locale}) }}'>
+                    data-href='{{ path('file_manager_delete', fileManager.queryParameters|merge({'_locale': locale})) }}'>
                 <i class="glyphicon glyphicon-remove"></i>
                 <span>{{ 'button.delete.current'|trans }}</span>
             </button>
@@ -116,7 +116,7 @@
     var moduleName = '{{ fileManager.module ? fileManager.module : 0 }}';
     var successMessage = '{{ 'file.add.success'|trans }}';
     var url = "{{ path('file_manager', fileManager.queryParameters|merge({'json':true, '_locale': locale}))|e('js') }}"
-    var urldelete = "{{ path('file_manager_delete', fileManager.queryParameters|merge{'_locale': locale} )|e('js') }}"
+    var urldelete = "{{ path('file_manager_delete', fileManager.queryParameters|merge({'_locale': locale}) )|e('js') }}"
     var deleteMessage = "{{ 'title.delete'|trans }}"
     var renameMessage = "{{ 'title.rename.file'|trans }}"
     var downloadMessage = "{{ 'title.download'|trans }}"
