@@ -48,7 +48,7 @@ class ManagerController extends Controller
      */
     public function indexAction(Request $request)
     {
-        $queryParameters = $request->query->all();
+        $queryParameters = array_merge($request->query->all(), [$request->get('_locale')]);
         $translator = $this->get('translator');
         $isJson = $request->get('json') ? true : false;
         if ($isJson) {
@@ -208,7 +208,7 @@ class ManagerController extends Controller
     public function renameFileAction(Request $request, $fileName)
     {
         $translator = $this->get('translator');
-        $queryParameters = $request->query->all();
+        $queryParameters = array_merge($request->query->all(), [$request->get('_locale')]);
         $formRename = $this->createRenameForm();
         /* @var Form $formRename */
         $formRename->handleRequest($request);
@@ -274,7 +274,7 @@ class ManagerController extends Controller
             }
 
             if (!$fileManager->getImagePath()) {
-                $file->url = $this->generateUrl('file_manager_file', array_merge($fileManager->getQueryParameters(), ['fileName' => $file->url]));
+                $file->url = $this->generateUrl('file_manager_file', array_merge($fileManager->getQueryParameters(), ['fileName' => $file->url], ['_locale' => $request->get('_locale')]));
             }
         }
 
@@ -314,7 +314,7 @@ class ManagerController extends Controller
     {
         $form = $this->createDeleteForm();
         $form->handleRequest($request);
-        $queryParameters = $request->query->all();
+        $queryParameters = array_merge($request->query->all(), [$request->get('_locale')]);
         if ($form->isSubmitted() && $form->isValid()) {
             // remove file
             $fileManager = $this->newFileManager($queryParameters);
@@ -322,20 +322,29 @@ class ManagerController extends Controller
             if (isset($queryParameters['delete'])) {
                 $is_delete = false;
                 foreach ($queryParameters['delete'] as $fileName) {
+                    $fileDeleted = true;
                     $filePath = realpath($fileManager->getCurrentPath().DIRECTORY_SEPARATOR.$fileName);
+                    $fileInfo = [
+                        'fileName' => $fileName,
+                        'filePath' => $filePath,
+                    ];
                     if (0 !== strpos($filePath, $fileManager->getCurrentPath())) {
                         $this->addFlash('danger', 'file.deleted.danger');
                     } else {
-                        $this->dispatch(FileManagerEvents::PRE_DELETE_FILE);
+                        $this->dispatch(FileManagerEvents::PRE_DELETE_FILE, $fileInfo);
                         try {
                             $fs->remove($filePath);
                             $is_delete = true;
                         } catch (IOException $exception) {
                             $this->addFlash('danger', 'file.deleted.unauthorized');
+                            $fileDeleted = false;
                         }
-                        $this->dispatch(FileManagerEvents::POST_DELETE_FILE);
+                        if ($fileDeleted) {
+                            $this->dispatch(FileManagerEvents::POST_DELETE_FILE, $fileInfo);
+                        }
                     }
                 }
+                $this->dispatch(FileManagerEvents::POST_DELETE_FILE_DONE, $fileInfo);
                 if ($is_delete) {
                     $this->addFlash('success', 'file.deleted.success');
                 }
