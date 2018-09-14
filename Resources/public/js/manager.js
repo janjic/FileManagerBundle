@@ -2,6 +2,14 @@ $(function () {
 
     var $renameModal = $('#js-confirm-rename');
     var $deleteModal = $('#js-confirm-delete');
+    var $connectModal = $('#findEntityModalButton');
+
+    $connectModal.on('click', function (event) {
+        event.preventDefault();
+        adapter.getData(Routing.generate('get_shipping_json', {_locale: getURLParameter('locale'), id: getURLParameter('id')}, true), callbackFunction, "");
+
+    })
+
     var callback = function (key, opt) {
         switch (key) {
             case 'edit':
@@ -39,8 +47,13 @@ $(function () {
         }
     });
 
+    function initiateConnectEntityModal() {
+
+    }
+
     function renameFile($renameModalButton) {
         $('#form_name').val($renameModalButton.data('name'));
+        $('#form_old_name').val($renameModalButton.data('old_name'));
         $('#form_extension').val($renameModalButton.data('extension'));
         $renameModal.find('form').attr('action', $renameModalButton.data('href'))
     }

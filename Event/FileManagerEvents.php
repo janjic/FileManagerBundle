@@ -22,4 +22,6 @@ final class FileManagerEvents
     const PRE_DELETE_FOLDER = ' file_manager.pre_delete_folder';
     /** @Event("Symfony\Component\EventDispatcher\GenericEvent") */
     const POST_DELETE_FOLDER = 'file_manager.post_delete_folder';
+    /** @Event("Symfony\Component\EventDispatcher\GenericEvent") */
+    const POST_FILE_RENAME = 'file_manager.post_rename_file';
 }

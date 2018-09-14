@@ -1,5 +1,4 @@
 <?php
-
 namespace Artgris\Bundle\FileManagerBundle\Controller;
 
 use Artgris\Bundle\FileManagerBundle\Event\FileManagerEvents;
@@ -38,7 +37,7 @@ class ManagerController extends Controller
     protected $fileManager;
 
     /**
-     * @Route("/{_locale}/backend/file/manager", name="file_manager", defaults={"_locale": "en"}, options={"expose" = true})
+     * @Route("/{_locale}/backend/file-manager", name="file_manager", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
      *
@@ -196,7 +195,7 @@ class ManagerController extends Controller
     }
 
     /**
-     * @Route("/{_locale}/backend/file/manager/rename/{fileName}", name="file_manager_rename", defaults={"_locale": "en"}, options={"expose" = true})
+     * @Route("/{_locale}/backend/file/manager/rename", name="file_manager_rename", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
      * @param $fileName
@@ -205,7 +204,7 @@ class ManagerController extends Controller
      *
      * @throws \Exception
      */
-    public function renameFileAction(Request $request, $fileName)
+    public function renameFileAction(Request $request)
     {
         $translator = $this->get('translator');
         $queryParameters = array_merge($request->query->all(), ['_locale' => $request->get('_locale')]);
@@ -215,6 +214,7 @@ class ManagerController extends Controller
         if ($formRename->isSubmitted() && $formRename->isValid()) {
             $data = $formRename->getData();
             $extension = $data['extension'] ? '.'.$data['extension'] : '';
+            $fileName = $data['old_name'].$extension;
             $newfileName = $data['name'].$extension;
             if ($newfileName !== $fileName && isset($data['name'])) {
                 $fileManager = $this->newFileManager($queryParameters);
@@ -227,6 +227,7 @@ class ManagerController extends Controller
                     try {
                         $fs->rename($OldfilePath, $NewfilePath);
                         $this->addFlash('success', $translator->trans('file.renamed.success'));
+                        $this->dispatch(FileManagerEvents::POST_FILE_RENAME, ['oldFileName' => $fileName, 'newFileName' => $newfileName]);
                         //File has been renamed successfully
                     } catch (IOException $exception) {
                         $this->addFlash('danger', $translator->trans('file.renamed.danger'));
@@ -324,10 +325,7 @@ class ManagerController extends Controller
                 foreach ($queryParameters['delete'] as $fileName) {
                     $fileDeleted = true;
                     $filePath = realpath($fileManager->getCurrentPath().DIRECTORY_SEPARATOR.$fileName);
-                    $fileInfo = [
-                        'fileName' => $fileName,
-                        'filePath' => $filePath,
-                    ];
+                    $fileInfo = ['fileName' => $fileName];
                     if (0 !== strpos($filePath, $fileManager->getCurrentPath())) {
                         $this->addFlash('danger', 'file.deleted.danger');
                     } else {
@@ -398,7 +396,9 @@ class ManagerController extends Controller
                     new NotBlank(),
                 ],
                 'label' => false,
-            ])->add('extension', HiddenType::class)
+            ])
+            ->add('old_name', HiddenType::class)
+            ->add('extension', HiddenType::class)
             ->add('send', SubmitType::class, [
                 'attr' => [
                     'class' => 'btn btn-primary',

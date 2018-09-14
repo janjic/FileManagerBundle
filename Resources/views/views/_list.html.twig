@@ -48,37 +48,44 @@
                     <small>{{ fileEntity.HTMLDimension }}</small>
                 </td>
                 <td class="text-right">
-            <span data-toggle="tooltip" title="{{ 'title.delete'|trans }}">
-                <button type="button"
-                        class="btn btn-xs btn-danger js-delete-modal"
-                        data-trigger="click"
-                        data-container="body"
-                        data-toggle="modal"
-                        data-target="#js-confirm-delete"
-                        data-placement="left"
-                        data-html="true"
-                        data-href='{{ path('file_manager_delete', fileManager.queryParameters|merge({'delete[]':file.fileName, '_locale': locale})) }}'>
-                    <span class="fa fa-trash"></span>
-                </button>
-            </span>
+                    <span data-toggle="tooltip" title="{{ 'title.delete'|trans }}">
+                        <button type="button"
+                                class="btn btn-xs btn-danger js-delete-modal"
+                                data-trigger="click"
+                                data-container="body"
+                                data-toggle="modal"
+                                data-target="#js-confirm-delete"
+                                data-placement="left"
+                                data-html="true"
+                                data-href='{{ path('file_manager_delete', fileManager.queryParameters|merge({'delete[]':file.fileName, '_locale': locale})) }}'>
+                            <span class="fa fa-trash"></span>
+                        </button>
+                    </span>
                     <span data-toggle="tooltip" title="{{ 'title.rename.file'|trans }}">
-                <button type="button"
-                        class="btn btn-xs btn-default js-rename-modal"
-                        data-trigger="click"
-                        data-container="body"
-                        data-toggle="modal"
-                        data-target="#js-confirm-rename"
-                        data-placement="left"
-                        data-html="true"
-                        data-name='{{ file.basename('.'~file.extension) }}'
-                        data-extension='{{ file.extension }}'
-                        data-href='{{ path('file_manager_rename', fileManager.queryParameters|merge({'fileName':file.fileName, '_locale': locale})) }}'>
-                <span class="fa fa-edit"></span>
-                </button>
+                        <button type="button"
+                                class="btn btn-xs btn-default js-rename-modal"
+                                data-trigger="click"
+                                data-container="body"
+                                data-toggle="modal"
+                                data-target="#js-confirm-rename"
+                                data-placement="left"
+                                data-html="true"
+                                data-name='{{ file.basename('.'~file.extension) }}'
+                                data-old_name='{{ file.basename('.'~file.extension) }}'
+                                data-extension='{{ file.extension }}'
+                                data-href='{{ path('file_manager_rename', fileManager.queryParameters|merge({'_locale': locale})) }}'>
+                        <span class="fa fa-edit"></span>
+                        </button>
+                    </span>
+                    <span data-toggle="tooltip" title="{{ 'Connect with entity'|trans }}">
+                        <button type="button"
+                                class="btn btn-xs btn-default findEntityModalButton">
+                        <span class="fa fa-code-fork"></span>
+                        </button>
                     </span>
                     {% if file.type == "file" %}
                         <a data-placement="left" title="{{ 'title.download'|trans }}" class="btn btn-xs btn-default js-download"
-                           href="{{ path('file_manager_file', fileManager.queryParameters|merge({'fileName':file.fileName, '_locale': locale})) }}" download>
+                            href="{{ path('file_manager_file', fileManager.queryParameters|merge({'fileName':file.fileName, '_locale': locale})) }}" download>
                             <span class="fa fa-download"></span>
                         </a>
                     {% endif %}
