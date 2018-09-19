@@ -143,23 +143,24 @@
         {% endfor %}
 
 
-        var $connectModal       = $('#findEntityModal');
-        var $connectModalButton = $('.findEntityModalButton');
-        var $entitySelect       = $('#entity');
-        var $entityField        = $('#entity-field');
-        var $entitySearchValue  = $('#search-value');
-        var classes,
-            selectedClass = null;
+        var $connectModal           = $('#findEntityModal');
+        var $connectModalButton     = $('.findEntityModalButton');
+        var $entitySelect           = $('#entity');
+        var $entityField            = $('#entity-field');
+        var $entitySearchValue      = $('#search-value');
+        var locationPath            = getQueryParameterByName('route');
+        var classes, selectedClass,
+            selectedImage           = null;
 
         $connectModalButton.on('click', function (event) {
             event.preventDefault();
+            selectedImage = $(this).data('name');
             function callbackFunction(ctx, data) {
                 classes = data;
                 for (const [key, value] of Object.entries(classes)) {
                     $entitySelect.append(new Option(value.name, key));
                 }
                 initializeEntitySelect();
-                initSearch();
 
                 $connectModal.modal();
             }
@@ -176,15 +177,28 @@
         });
 
         $connectModal.on('hidden.bs.modal', function () {
-            selectedClass = null;
+            selectedClass = selectedImage = null;
             if ($entitySelect.data('select2')) {
+                $entitySelect.unbind('select2:select');
                 $entitySelect.select2('destroy');
             }
             if ($entityField.data('select2')) {
                 $entityField.empty();
+                $entityField.unbind('select2:select');
                 $entityField.select2('destroy');
             }
+            if ($entitySearchValue.data('select2')) {
+                $entitySearchValue.empty();
+                $entitySearchValue.unbind('select2:select');
+                $entitySearchValue.select2('destroy');
+            }
+            hideSelects();
         });
+
+        function hideSelects() {
+            $entityField.closest('.form-group').hide();
+            $entitySearchValue.closest('.form-group').hide();
+        }
 
         function initializeEntitySelect() {
             $entitySelect.val([]);
@@ -209,7 +223,11 @@
                         $entityField.select2({
                             dropdownParent: $("#findEntityModal"),
                             placeholder: Translator.trans('Select field')
+                        }).on('select2:select', function () {
+                            initSearch();
+                            $entitySearchValue.closest('.form-group').show();
                         });
+                        $entityField.closest('.form-group').show();
 
                         return true;
                     }
@@ -223,6 +241,7 @@
                 dropdownParent: $("#findEntityModal"),
                 placeholder: Translator.trans('Search main entity'),
                 minimumInputLength: 1,
+                dataType: 'json',
                 ajax: {
                     url: Routing.generate('file_manager_entity_search', {_locale: getURLParameter('locale') }, true),
                     delay: 250,
@@ -248,11 +267,35 @@
                         };
                     }
                 },
-                escapeMarkup: function(markup) {
+                escapeMarkup: function (markup) {
                     return markup;
+                },
+                templateResult: function (item) {
+                    if (item.loading) return Translator.trans('Loading') + '...';
+
+                    item.text = item.title;
+
+                    return '<div class="select2-result clearfix" data-id="' + item.id + '" data-title="' + item.id + '">' + item.title + '</div>';
                 }
-            }).on('select2:select', function(element) {
-                console.log(element);
+            }).on('select2:select', function(e) {
+                let element = e.params.data;
+                let obj = {
+                    entity: selectedClass.path,
+                    entityId: element.id,
+                    field: $entityField.val(),
+                    fileName: selectedImage,
+                    filePath: locationPath
+                };
+                function successFunction(ctx, data) {
+                    if (data.status === 200) {
+                        toastr.success(Translator.trans(data.message));
+                    } else {
+                        toastr.error(Translator.trans(data.message));
+                    }
+                    $connectModal.modal('hide');
+                }
+
+                adapter.sendData(Routing.generate('file_manager_assign_file_json', {_locale: getURLParameter('locale')}, true), obj, "POST", successFunction, $(this));
             });
         }
 
