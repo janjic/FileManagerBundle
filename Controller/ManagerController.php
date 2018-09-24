@@ -243,6 +243,97 @@ class ManagerController extends Controller
     }
 
     /**
+     *
+     * Logging operation - to a file (upload_log.txt) and to the stdout
+     * @param string $str - the logging string
+     */
+    public function log($str)
+    {
+        // log to the output
+        $logStr = date('d.m.Y').": {$str}\r\n";
+        echo $logStr;
+
+        // log to file
+        if (($fp = fopen('upload_log.txt', 'a+')) !== false) {
+            fwrite($fp, $logStr);
+            fclose($fp);
+        }
+    }
+
+    /**
+     *
+     * Delete a directory RECURSIVELY
+     * @param string $dir - directory path
+     *
+     * @link http://php.net/manual/en/function.rmdir.php
+     */
+    public function rrmdir($dir)
+    {
+        if (is_dir($dir)) {
+            $objects = scandir($dir);
+            foreach ($objects as $object) {
+                if ('.' !== $object && '..' !== $object) {
+                    if (filetype($dir.'/'.$object) === 'dir') {
+                        $this->rrmdir($dir.'/'.$object);
+                    } else {
+                        unlink($dir.'/'.$object);
+                    }
+                }
+            }
+            reset($objects);
+            rmdir($dir);
+        }
+    }
+
+    /**
+     * Check if all the parts exist, and gather all the parts of the file together
+     * @param string $tempDir    - the temporary directory holding all the parts of the file
+     * @param string $fileName   - the original file name
+     * @param string $chunkSize  - each chunk size (in bytes)
+     * @param string $totalSize  - original file size (in bytes)
+     * @param string $totalFiles - original file size (in bytes)
+     *
+     * @return bool
+     */
+    public function createFileFromChunks($tempDir, $fileName, $chunkSize, $totalSize, $totalFiles)
+    {
+
+        // count all the parts of this file
+        $totalFilesOnServerSize = 0;
+        $tempTotal = 0;
+        foreach (scandir($tempDir) as $file) {
+            $tempTotal = $totalFilesOnServerSize;
+            $tempfilesize = filesize($tempDir.'/'.$file);
+            $totalFilesOnServerSize = $tempTotal + $tempfilesize;
+        }
+        // check that all the parts are present
+        // If the Size of all the chunks on the server is equal to the size of the file uploaded.
+        if ($totalFilesOnServerSize >= $totalSize) {
+            // create the final destination file
+            if (($fp = fopen($tempDir.'/'.$fileName, 'w')) !== false) {
+                for ($i = 1; $i <= $totalFiles; $i++) {
+                    fwrite($fp, file_get_contents($tempDir.'/'.$fileName.'.part'.$i));
+                    $this->log('writing chunk '.$i);
+                }
+                fclose($fp);
+            } else {
+                $this->log('cannot create the destination file');
+
+                return false;
+            }
+
+            // rename the temporary directory (to avoid access from other
+            // concurrent chunks uploads) and than delete it
+            if (rename($tempDir, $tempDir.'_UNUSED')) {
+                $this->rrmdir($tempDir.'_UNUSED');
+            } else {
+                $this->rrmdir($tempDir);
+            }
+        }
+    }
+
+
+    /**
      * @Route("/{_locale}/backend/file/manager/archive-upload/", name="file_manager_upload_archive", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
@@ -253,17 +344,90 @@ class ManagerController extends Controller
      */
     public function uploadArchiveFileAction(Request $request)
     {
+
+        if ('GET' === $_SERVER['REQUEST_METHOD']) {
+            if (!(isset($_GET['resumableIdentifier']) && '' !== trim($_GET['resumableIdentifier']))) {
+                $_GET['resumableIdentifier'] = '';
+            }
+            $tempDir = 'temp/'.$_GET['resumableIdentifier'];
+            if (!(isset($_GET['resumableFilename']) && '' !== trim($_GET['resumableFilename']))) {
+                $_GET['resumableFilename'] = '';
+            }
+            if (!(isset($_GET['resumableChunkNumber']) && '' !== trim($_GET['resumableChunkNumber']))) {
+                $_GET['resumableChunkNumber'] = '';
+            }
+            $chunkFile = $tempDir.'/'.$_GET['resumableFilename'].'.part'.$_GET['resumableChunkNumber'];
+            if (file_exists($chunkFile)) {
+                header('HTTP/1.0 200 Ok');
+            } else {
+                header('HTTP/1.0 404 Not Found');
+            }
+        }
+
+// loop through files and move the chunks to a temporarily created directory
+        if (!empty($_FILES)) {
+            foreach ($_FILES as $file) {
+                // check the error status
+                if ((int) $file['error'] !== 0) {
+                    $this->log('error '.$file['error'].' in file '.$_POST['resumableFilename']);
+                    continue;
+                }
+
+                // init the destination file (format <filename.ext>.part<#chunk>
+                // the file is stored in a temporary directory
+                if (isset($_POST['resumableIdentifier']) && '' !== trim($_POST['resumableIdentifier'])) {
+                    $tempDir = 'temp/'.$_POST['resumableIdentifier'];
+                }
+                $destFile = $tempDir.'/'.$_POST['resumableFilename'].'.part'.$_POST['resumableChunkNumber'];
+
+                // create the temporary directory
+                if (!is_dir($tempDir)) {
+                    mkdir($tempDir, 0777, true);
+                }
+
+                // move the temporary file
+                if (!move_uploaded_file($file['tmp_name'], $destFile)) {
+                    $this->log('Error saving (move_uploaded_file) chunk '.$_POST['resumableChunkNumber'].' for file '.$_POST['resumableFilename']);
+                } else {
+                    // check if all the parts present, and create the final destination file
+                    $this->createFileFromChunks($tempDir, $_POST['resumableFilename'], $_POST['resumableChunkSize'], $_POST['resumableTotalSize'], $_POST['resumableTotalChunks']);
+                }
+            }
+        }
+
+
+        return new JsonResponse('ok');
+
+
+
+
+
+
+
+
+
+
+        $fileManager = $this->newFileManager($request->query->all());
+
+        $options = [
+            'upload_dir' => $fileManager->getCurrentPath().DIRECTORY_SEPARATOR,
+            'upload_url' => $fileManager->getImagePath(),
+            'accept_file_types' => $fileManager->getRegex(),
+            'print_response' => false,
+        ];
+        if (isset($fileManager->getConfiguration()['upload'])) {
+            $options += $fileManager->getConfiguration()['upload'];
+        }
+        $uploadHandler = new UploadHandler($options);
+        $response = $uploadHandler->response;
+
+        return new JsonResponse('ok');
+
+
+
 //        $fileManager = $this->newFileManager($request->query->all());
 //        $targetDir = sprintf('%s%s', $fileManager->getBasePath(), (isset($_REQUEST['identity']) ? DIRECTORY_SEPARATOR.$_REQUEST['identity'] : ''));
         $targetDir = '/var/www/instances/fwebshop.home/web/uploads/test';
-        $in = fopen('php://input', 'rb');
-
-        while ($buff = fread($in, 4096)) {
-            $test = 'aaaa';
-        }
-        fclose($in);
-
-        return new JsonResponse('ok');
 
         $cleanupTargetDir = false; // Remove old files
         $maxFileAge = 5 * 3600; // Temp file age in seconds
@@ -314,6 +478,11 @@ class ManagerController extends Controller
             if (!$in = fopen($_FILES['file']['tmp_name'], 'rb')) {
                 return new JsonResponse(['error'   => ['message' => 'Failed to open input stream.', 'id' => 'id']], 101);
             }
+        } elseif (!empty($_REQUEST['file'])) {
+            // Read binary input stream and append it to temp file
+            if (!$in = fopen($_REQUEST['file'], 'rb')) {
+                return new JsonResponse(['error'   => ['message' => 'Failed to open input stream.', 'id' => 'id']], 101);
+            }
         } elseif (!$in = fopen('php://input', 'rb')) {
             return new JsonResponse(['error'   => ['message' => 'Failed to open input stream.', 'id' => 'id']], 101);
         }
@@ -330,17 +499,17 @@ class ManagerController extends Controller
 
             try {
 //                $moveToDir = $fileManager->getCurrentPath();
-//                $zip = new ZipArchive();
-                $zippy = Zippy::load();
-//                $res = $zip->open($filePath);
+                $zip = new \ZipArchive();
+//                $zippy = Zippy::load();
+                $res = $zip->open($filePath);
                 $extractDir = $targetDir.DIRECTORY_SEPARATOR.'tmp';
                 if (!file_exists($targetDir)) {
                     @mkdir($targetDir);
                 }
-                $archive = $zippy->open($filePath);
-                $archive->extract($targetDir);
-//                $result = $zip->extractTo($targetDir);
-//                $zip->close();
+//                $archive = $zippy->open($filePath);
+//                $archive->extract($targetDir);
+                $result = $zip->extractTo($targetDir);
+                $zip->close();
             } catch (\Exception $e) {
                 return new JsonResponse(['error'   => ['message' => 'Failed to open uploaded file.', 'id' => 'id']], 104);
             }

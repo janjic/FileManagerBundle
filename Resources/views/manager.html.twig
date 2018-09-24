@@ -7,6 +7,7 @@
 {% block customStylesheets %}
     <link rel="stylesheet" href="{{ asset('bundles/artgrisfilemanager/libs/blueimp-file-upload/css/jquery.fileupload.css') }}">
     <link rel="stylesheet" href="{{ asset('bundles/artgrisfilemanager/css/manager.css') }}">
+    <link href="https://transloadit.edgly.net/releases/uppy/v0.27.4/dist/uppy.min.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -89,15 +90,7 @@
                 {% else %}
                 <div class="col-lg-12">
                     {% endif %}
-                    <a id="archiveupload" href="javascript:;">UPLOAD</a>
-
-                    <form action="{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}" method="post" enctype="multipart/form-data">
-                        Select image to upload:
-                        <input type="file" name="fileToUpload" id="fileToUpload">
-                        <input type="submit" value="Upload Image" name="submit">
-                    </form>
-
-
+                    <span id="archiveupload">UPLOAD</span>
 
                     <form id="form-multiple-delete">
                         {% include '@ArtgrisFileManager/views/_manager_view.html.twig' with {'fileManager' :fileManager,  'fileArray' : fileArray, 'formDelete' : formDelete} only %}
@@ -114,6 +107,8 @@
     <script src="{{ asset('bundles/artgrisfilemanager/libs/blueimp-file-upload/js/jquery.fileupload.js') }}"></script>
     <script src="{{ asset('bundles/artgrisfilemanager/libs/sticky-kit/jquery.sticky-kit.min.js') }}"></script>
     <script src="{{ asset('bundles/artgrisfilemanager/libs/remarkable-bootstrap-notify/dist/bootstrap-notify.min.js') }}"></script>
+    <script src="https://transloadit.edgly.net/releases/uppy/v0.27.4/dist/uppy.min.js"></script>
+
 
     <script>
         var treedata = {{ treeData|raw }};
@@ -318,68 +313,89 @@
             });
         }
 
+        var flow;
+
         $(document).ready(function () {
-            generateIdentity = function () {
-                return 'tmp_' + (+ new Date()) + '_archive';
-            };
-            var uploader = new plupload.Uploader({
-                browse_button : 'archiveupload',
-                url : '{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}',
-                chunk_size : '5mb',
-                unique_names : true,
-                multiple_queues: false,
-                filters : {
-                    max_file_size : '1000mb',
-                    // Specify what files to browse for
-                    mime_types: [
-                        {title : "Zip files", extensions : "zip"}
-                    ]
-                },
-                multipart_params: {
-                    identity: generateIdentity()
-                },
-                flash_swf_url : '../js/Moxie.swf',
-                silverlight_xap_url : '../js/Moxie.xap',
 
-                // Post init events, bound after the internal events
-                init : {
 
-                    BeforeUpload: function(up, file) {
-                        // Called right before the upload for a given file starts, can be used to cancel it if required
-                    },
-
-                    UploadProgress: function(up, file) {
-                        // Called while file is being uploaded
-                        window[file.uid].update('progress', Number.isInteger(file.percent) ? file.percent : 0);
-                    },
-
-                    FilesAdded: function(up, files) {
-                        // Called when files are added to queue
-
-                        plupload.each(files, function(file) {
-                            window[file.uid] = displayAlert('success', file.name, true);
-                        });
-
-                        // Start files upload
-                        uploader.start();
-                    },
-
-                    FileUploaded: function(up, file, info) {
-                        // Called when file has finished uploading
-                        window[file.uid].close();
-                    },
-
-                    UploadComplete: function(up, files) {
-                        // Called when all files are either uploaded or failed
-                    },
-
-                    Error: function(up, args) {
-                        // Called when error occurs
-                    }
-                }
+            flow = new Flow({
+                target: '{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}',
+                chunkSize: 2000000
             });
 
-            uploader.init();
+            flow.assignBrowse(document.getElementById('archiveupload'));
+
+            flow.on('fileAdded', function(file, event){
+                console.log(file, event);
+            });
+            flow.on('fileSuccess', function(file, message){
+                console.log(file, message);
+            });
+            flow.on('fileError', function(file, message){
+                console.log(file, message);
+            });
+
+            {#generateIdentity = function () {#}
+                {#return 'tmp_' + (+ new Date()) + '_archive';#}
+            {#};#}
+            {#var uploader = new plupload.Uploader({#}
+                {#browse_button : 'archiveupload',#}
+                {#url : '{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}',#}
+                {#chunk_size : '20mb',#}
+                {#unique_names : true,#}
+                {#multiple_queues: false,#}
+                {#filters : {#}
+                    {#max_file_size : '1000mb',#}
+                    {#// Specify what files to browse for#}
+                    {#mime_types: [#}
+                        {#{title : "Zip files", extensions : "zip"}#}
+                    {#]#}
+                {#},#}
+                {#multipart_params: {#}
+                    {#identity: generateIdentity()#}
+                {#},#}
+                {#flash_swf_url : '../js/Moxie.swf',#}
+                {#silverlight_xap_url : '../js/Moxie.xap',#}
+
+                {#// Post init events, bound after the internal events#}
+                {#init : {#}
+
+                    {#BeforeUpload: function(up, file) {#}
+                        {#// Called right before the upload for a given file starts, can be used to cancel it if required#}
+                    {#},#}
+
+                    {#UploadProgress: function(up, file) {#}
+                        {#// Called while file is being uploaded#}
+                        {#window[file.uid].update('progress', Number.isInteger(file.percent) ? file.percent : 0);#}
+                    {#},#}
+
+                    {#FilesAdded: function(up, files) {#}
+                        {#// Called when files are added to queue#}
+
+                        {#plupload.each(files, function(file) {#}
+                            {#window[file.uid] = displayAlert('success', file.name, true);#}
+                        {#});#}
+
+                        {#// Start files upload#}
+                        {#uploader.start();#}
+                    {#},#}
+
+                    {#FileUploaded: function(up, file, info) {#}
+                        {#// Called when file has finished uploading#}
+                        {#window[file.uid].close();#}
+                    {#},#}
+
+                    {#UploadComplete: function(up, files) {#}
+                        {#// Called when all files are either uploaded or failed#}
+                    {#},#}
+
+                    {#Error: function(up, args) {#}
+                        {#// Called when error occurs#}
+                    {#}#}
+                {#}#}
+            {#});#}
+
+            {#uploader.init();#}
         });
 
 
