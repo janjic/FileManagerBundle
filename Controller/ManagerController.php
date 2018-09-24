@@ -1,6 +1,7 @@
 <?php
 namespace Artgris\Bundle\FileManagerBundle\Controller;
 
+use Alchemy\Zippy\Zippy;
 use Artgris\Bundle\FileManagerBundle\Event\FileManagerEvents;
 use Artgris\Bundle\FileManagerBundle\Helpers\File;
 use Artgris\Bundle\FileManagerBundle\Helpers\FileManager;
@@ -242,6 +243,114 @@ class ManagerController extends Controller
     }
 
     /**
+     * @Route("/{_locale}/backend/file/manager/archive-upload/", name="file_manager_upload_archive", defaults={"_locale": "en"}, options={"expose" = true})
+     *
+     * @param Request $request
+     *
+     * @return Response
+     *
+     * @throws \Exception
+     */
+    public function uploadArchiveFileAction(Request $request)
+    {
+//        $fileManager = $this->newFileManager($request->query->all());
+//        $targetDir = sprintf('%s%s', $fileManager->getBasePath(), (isset($_REQUEST['identity']) ? DIRECTORY_SEPARATOR.$_REQUEST['identity'] : ''));
+        $targetDir = '/var/www/instances/fwebshop.home/web/uploads/test';
+        $in = fopen('php://input', 'rb');
+
+        while ($buff = fread($in, 4096)) {
+            $test = 'aaaa';
+        }
+        fclose($in);
+
+        return new JsonResponse('ok');
+
+        $cleanupTargetDir = false; // Remove old files
+        $maxFileAge = 5 * 3600; // Temp file age in seconds
+        // Create target dir
+        if (!file_exists($targetDir)) {
+            @mkdir($targetDir);
+        }
+        // Get a file name
+        if (isset($_REQUEST['name'])) {
+            $fileName = $_REQUEST['name'];
+        } elseif (!empty($_FILES)) {
+            $fileName = $_FILES['file']['name'];
+        } else {
+            $fileName = uniqid('file_');
+        }
+        $filePath = $targetDir.DIRECTORY_SEPARATOR.$fileName;
+        // Chunking might be enabled
+        $chunk = isset($_REQUEST['chunk']) ? (int) $_REQUEST['chunk'] : 0;
+        $chunks = isset($_REQUEST['chunks']) ? (int) $_REQUEST['chunks'] : 0;
+        // Remove old temp files
+        if ($cleanupTargetDir) {
+            if (!is_dir($targetDir) || !$dir = opendir($targetDir)) {
+                return new JsonResponse(['error'   => ['message' => 'Failed to open temp directory.', 'id' => 'id']], 100);
+            }
+            while (($file = readdir($dir)) !== false) {
+                $tmpfilePath = $targetDir.DIRECTORY_SEPARATOR.$file;
+                // If temp file is current file proceed to the next
+                if ("{$filePath}.part" === $tmpfilePath) {
+                    continue;
+                }
+                // Remove temp file if it is older than the max age and is not the current file
+                if (preg_match('/\.part$/', $file) && (filemtime($tmpfilePath) < time() - $maxFileAge)) {
+                    @unlink($tmpfilePath);
+                }
+            }
+            closedir($dir);
+        }
+        // Open temp file
+        if (!$out = fopen("{$filePath}.part", $chunks ? 'ab' : 'wb')) {
+            return new JsonResponse(['error'   => ['message' => 'Failed to open output stream.', 'id' => 'id']], 102);
+        }
+
+        if (!empty($_FILES)) {
+            if ($_FILES['file']['error'] || !is_uploaded_file($_FILES['file']['tmp_name'])) {
+                return new JsonResponse(['error'   => ['message' => 'Failed to move uploaded file.', 'id' => 'id']], 103);
+            }
+            // Read binary input stream and append it to temp file
+            if (!$in = fopen($_FILES['file']['tmp_name'], 'rb')) {
+                return new JsonResponse(['error'   => ['message' => 'Failed to open input stream.', 'id' => 'id']], 101);
+            }
+        } elseif (!$in = fopen('php://input', 'rb')) {
+            return new JsonResponse(['error'   => ['message' => 'Failed to open input stream.', 'id' => 'id']], 101);
+        }
+
+        while ($buff = fread($in, 4096)) {
+            fwrite($out, $buff);
+        }
+        fclose($out);
+        fclose($in);
+        // Check if file has been uploaded
+        if (!$chunks || $chunk ===  $chunks - 1) {
+            // Strip the temp .part suffix off
+            rename("{$filePath}.part", $filePath);
+
+            try {
+//                $moveToDir = $fileManager->getCurrentPath();
+//                $zip = new ZipArchive();
+                $zippy = Zippy::load();
+//                $res = $zip->open($filePath);
+                $extractDir = $targetDir.DIRECTORY_SEPARATOR.'tmp';
+                if (!file_exists($targetDir)) {
+                    @mkdir($targetDir);
+                }
+                $archive = $zippy->open($filePath);
+                $archive->extract($targetDir);
+//                $result = $zip->extractTo($targetDir);
+//                $zip->close();
+            } catch (\Exception $e) {
+                return new JsonResponse(['error'   => ['message' => 'Failed to open uploaded file.', 'id' => 'id']], 104);
+            }
+        }
+
+        return new JsonResponse(['result' => null, 'id' => 'id']);
+    }
+
+
+    /**
      * @Route("/{_locale}/backend/file/manager/upload/", name="file_manager_upload", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
@@ -321,7 +430,7 @@ class ManagerController extends Controller
             $fileManager = $this->newFileManager($queryParameters);
             $fs = new Filesystem();
             if (isset($queryParameters['delete'])) {
-                $is_delete = false;
+                $isDelete = false;
                 foreach ($queryParameters['delete'] as $fileName) {
                     $fileDeleted = true;
                     $filePath = realpath($fileManager->getCurrentPath().DIRECTORY_SEPARATOR.$fileName);
@@ -332,7 +441,7 @@ class ManagerController extends Controller
                         $this->dispatch(FileManagerEvents::PRE_DELETE_FILE, $fileInfo);
                         try {
                             $fs->remove($filePath);
-                            $is_delete = true;
+                            $isDelete = true;
                         } catch (IOException $exception) {
                             $this->addFlash('danger', 'file.deleted.unauthorized');
                             $fileDeleted = false;
@@ -343,7 +452,7 @@ class ManagerController extends Controller
                     }
                 }
                 $this->dispatch(FileManagerEvents::POST_DELETE_FILE_DONE, $fileInfo);
-                if ($is_delete) {
+                if ($isDelete) {
                     $this->addFlash('success', 'file.deleted.success');
                 }
                 unset($queryParameters['delete']);

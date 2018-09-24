@@ -37,6 +37,12 @@
                        accept="{{ fileManager.configuration.accept is defined ? fileManager.configuration.accept : (fileManager.type ? accept(fileManager.type)) }}">
             </span>
 
+            {#<span class="btn btn-success btn-sm fileinput-button btn-action">#}
+                {#<i class="glyphicon glyphicon-file"></i>#}
+                {#<span>{{ 'Add archive'|trans }}</span>#}
+                {#<a id="archiveupload" href="javascript:;">#}
+            {#</span>#}
+
             <button type="button" class="btn btn-primary btn-sm btn-action" data-toggle="modal" data-target="#addFolder">
                 <i class="glyphicon glyphicon-folder-open"></i>
                 <span>{{ 'button.add.folder'|trans }}</span>
@@ -83,6 +89,16 @@
                 {% else %}
                 <div class="col-lg-12">
                     {% endif %}
+                    <a id="archiveupload" href="javascript:;">UPLOAD</a>
+
+                    <form action="{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}" method="post" enctype="multipart/form-data">
+                        Select image to upload:
+                        <input type="file" name="fileToUpload" id="fileToUpload">
+                        <input type="submit" value="Upload Image" name="submit">
+                    </form>
+
+
+
                     <form id="form-multiple-delete">
                         {% include '@ArtgrisFileManager/views/_manager_view.html.twig' with {'fileManager' :fileManager,  'fileArray' : fileArray, 'formDelete' : formDelete} only %}
                     </form>
@@ -113,10 +129,13 @@
 
     <script>
         // display alert
-        function displayAlert(type, msg) {
-            $.notify({
+        function displayAlert(type, msg, progressBar) {
+            let pBar = progressBar !== undefined && progressBar;
+            return $.notify({
                 message: msg
             }, {
+                showProgressbar: pBar,
+                delay: pBar ? 0 : 5000,
                 type: type,
                 placement: {
                     from: "bottom",
@@ -298,6 +317,70 @@
                 adapter.sendData(Routing.generate('file_manager_assign_file_json', {_locale: getURLParameter('locale')}, true), obj, "POST", successFunction, $(this));
             });
         }
+
+        $(document).ready(function () {
+            generateIdentity = function () {
+                return 'tmp_' + (+ new Date()) + '_archive';
+            };
+            var uploader = new plupload.Uploader({
+                browse_button : 'archiveupload',
+                url : '{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}',
+                chunk_size : '5mb',
+                unique_names : true,
+                multiple_queues: false,
+                filters : {
+                    max_file_size : '1000mb',
+                    // Specify what files to browse for
+                    mime_types: [
+                        {title : "Zip files", extensions : "zip"}
+                    ]
+                },
+                multipart_params: {
+                    identity: generateIdentity()
+                },
+                flash_swf_url : '../js/Moxie.swf',
+                silverlight_xap_url : '../js/Moxie.xap',
+
+                // Post init events, bound after the internal events
+                init : {
+
+                    BeforeUpload: function(up, file) {
+                        // Called right before the upload for a given file starts, can be used to cancel it if required
+                    },
+
+                    UploadProgress: function(up, file) {
+                        // Called while file is being uploaded
+                        window[file.uid].update('progress', Number.isInteger(file.percent) ? file.percent : 0);
+                    },
+
+                    FilesAdded: function(up, files) {
+                        // Called when files are added to queue
+
+                        plupload.each(files, function(file) {
+                            window[file.uid] = displayAlert('success', file.name, true);
+                        });
+
+                        // Start files upload
+                        uploader.start();
+                    },
+
+                    FileUploaded: function(up, file, info) {
+                        // Called when file has finished uploading
+                        window[file.uid].close();
+                    },
+
+                    UploadComplete: function(up, files) {
+                        // Called when all files are either uploaded or failed
+                    },
+
+                    Error: function(up, args) {
+                        // Called when error occurs
+                    }
+                }
+            });
+
+            uploader.init();
+        });
 
 
     </script>

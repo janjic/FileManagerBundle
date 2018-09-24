@@ -54,9 +54,17 @@
                             data-placement="left"
                             data-html="true"
                             data-name='{{ file.basename('.'~file.extension) }}'
+                            data-old_name='{{ file.basename('.'~file.extension) }}'
                             data-extension='{{ file.extension }}'
                             data-href='{{ path('file_manager_rename', fileManager.queryParameters|merge({'fileName':file.fileName, '_locale': locale})) }}'>
                     <span class="fa fa-edit"></span>
+                    </button>
+                </span>
+                <span data-toggle="tooltip" title="{{ 'Connect with entity'|trans }}">
+                    <button type="button"
+                            class="btn btn-sm btn-default findEntityModalButton"
+                            data-name='{{ file.filename }}'>
+                    <span class="fa fa-code-fork"></span>
                     </button>
                 </span>
                 {% if file.type == "file" %}

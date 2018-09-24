@@ -113,6 +113,18 @@ i.fa {
     color: #337ab7;
 }
 
+.progress {
+    height: 5px;
+    background-color: #fff;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    margin: 0;
+    left: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
 button i {
     padding-right: 4px;
 }
