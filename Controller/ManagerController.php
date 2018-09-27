@@ -7,6 +7,7 @@ use Artgris\Bundle\FileManagerBundle\Helpers\File;
 use Artgris\Bundle\FileManagerBundle\Helpers\FileManager;
 use Artgris\Bundle\FileManagerBundle\Helpers\UploadHandler;
 use Artgris\Bundle\FileManagerBundle\Twig\OrderExtension;
+use PHP_CodeSniffer\Tokenizers\JS;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
@@ -199,7 +200,6 @@ class ManagerController extends Controller
      * @Route("/{_locale}/backend/file/manager/rename", name="file_manager_rename", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
-     * @param $fileName
      *
      * @return \Symfony\Component\HttpFoundation\RedirectResponse
      *
@@ -216,19 +216,19 @@ class ManagerController extends Controller
             $data = $formRename->getData();
             $extension = $data['extension'] ? '.'.$data['extension'] : '';
             $fileName = $data['old_name'].$extension;
-            $newfileName = $data['name'].$extension;
-            if ($newfileName !== $fileName && isset($data['name'])) {
+            $newFileName = $data['name'].$extension;
+            if ($newFileName !== $fileName && isset($data['name'])) {
                 $fileManager = $this->newFileManager($queryParameters);
-                $NewfilePath = $fileManager->getCurrentPath().DIRECTORY_SEPARATOR.$newfileName;
-                $OldfilePath = realpath($fileManager->getCurrentPath().DIRECTORY_SEPARATOR.$fileName);
-                if (0 !== strpos($NewfilePath, $fileManager->getCurrentPath())) {
+                $newFilePath = $fileManager->getCurrentPath().DIRECTORY_SEPARATOR.$newFileName;
+                $oldFilePath = realpath($fileManager->getCurrentPath().DIRECTORY_SEPARATOR.$fileName);
+                if (0 !== strpos($newFilePath, $fileManager->getCurrentPath())) {
                     $this->addFlash('danger', $translator->trans('file.renamed.unauthorized'));
                 } else {
                     $fs = new Filesystem();
                     try {
-                        $fs->rename($OldfilePath, $NewfilePath);
+                        $fs->rename($oldFilePath, $newFilePath);
                         $this->addFlash('success', $translator->trans('file.renamed.success'));
-                        $this->dispatch(FileManagerEvents::POST_FILE_RENAME, ['oldFileName' => $fileName, 'newFileName' => $newfileName]);
+                        $this->dispatch(FileManagerEvents::POST_FILE_RENAME, ['oldFileName' => $fileName, 'newFileName' => $newFileName]);
                         //File has been renamed successfully
                     } catch (IOException $exception) {
                         $this->addFlash('danger', $translator->trans('file.renamed.danger'));
@@ -242,280 +242,54 @@ class ManagerController extends Controller
         return $this->redirectToRoute('file_manager', $queryParameters);
     }
 
-    /**
-     *
-     * Logging operation - to a file (upload_log.txt) and to the stdout
-     * @param string $str - the logging string
-     */
-    public function log($str)
-    {
-        // log to the output
-        $logStr = date('d.m.Y').": {$str}\r\n";
-        echo $logStr;
-
-        // log to file
-        if (($fp = fopen('upload_log.txt', 'a+')) !== false) {
-            fwrite($fp, $logStr);
-            fclose($fp);
-        }
-    }
-
-    /**
-     *
-     * Delete a directory RECURSIVELY
-     * @param string $dir - directory path
-     *
-     * @link http://php.net/manual/en/function.rmdir.php
-     */
-    public function rrmdir($dir)
-    {
-        if (is_dir($dir)) {
-            $objects = scandir($dir);
-            foreach ($objects as $object) {
-                if ('.' !== $object && '..' !== $object) {
-                    if (filetype($dir.'/'.$object) === 'dir') {
-                        $this->rrmdir($dir.'/'.$object);
-                    } else {
-                        unlink($dir.'/'.$object);
-                    }
-                }
-            }
-            reset($objects);
-            rmdir($dir);
-        }
-    }
-
-    /**
-     * Check if all the parts exist, and gather all the parts of the file together
-     * @param string $tempDir    - the temporary directory holding all the parts of the file
-     * @param string $fileName   - the original file name
-     * @param string $chunkSize  - each chunk size (in bytes)
-     * @param string $totalSize  - original file size (in bytes)
-     * @param string $totalFiles - original file size (in bytes)
-     *
-     * @return bool
-     */
-    public function createFileFromChunks($tempDir, $fileName, $chunkSize, $totalSize, $totalFiles)
-    {
-
-        // count all the parts of this file
-        $totalFilesOnServerSize = 0;
-        $tempTotal = 0;
-        foreach (scandir($tempDir) as $file) {
-            $tempTotal = $totalFilesOnServerSize;
-            $tempfilesize = filesize($tempDir.'/'.$file);
-            $totalFilesOnServerSize = $tempTotal + $tempfilesize;
-        }
-        // check that all the parts are present
-        // If the Size of all the chunks on the server is equal to the size of the file uploaded.
-        if ($totalFilesOnServerSize >= $totalSize) {
-            // create the final destination file
-            if (($fp = fopen($tempDir.'/'.$fileName, 'w')) !== false) {
-                for ($i = 1; $i <= $totalFiles; $i++) {
-                    fwrite($fp, file_get_contents($tempDir.'/'.$fileName.'.part'.$i));
-                    $this->log('writing chunk '.$i);
-                }
-                fclose($fp);
-            } else {
-                $this->log('cannot create the destination file');
-
-                return false;
-            }
-
-            // rename the temporary directory (to avoid access from other
-            // concurrent chunks uploads) and than delete it
-            if (rename($tempDir, $tempDir.'_UNUSED')) {
-                $this->rrmdir($tempDir.'_UNUSED');
-            } else {
-                $this->rrmdir($tempDir);
-            }
-        }
-    }
-
 
     /**
      * @Route("/{_locale}/backend/file/manager/archive-upload/", name="file_manager_upload_archive", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
      *
-     * @return Response
+     * @return JsonResponse
      *
      * @throws \Exception
      */
     public function uploadArchiveFileAction(Request $request)
     {
-
-        if ('GET' === $_SERVER['REQUEST_METHOD']) {
-            if (!(isset($_GET['resumableIdentifier']) && '' !== trim($_GET['resumableIdentifier']))) {
-                $_GET['resumableIdentifier'] = '';
-            }
-            $tempDir = 'temp/'.$_GET['resumableIdentifier'];
-            if (!(isset($_GET['resumableFilename']) && '' !== trim($_GET['resumableFilename']))) {
-                $_GET['resumableFilename'] = '';
-            }
-            if (!(isset($_GET['resumableChunkNumber']) && '' !== trim($_GET['resumableChunkNumber']))) {
-                $_GET['resumableChunkNumber'] = '';
-            }
-            $chunkFile = $tempDir.'/'.$_GET['resumableFilename'].'.part'.$_GET['resumableChunkNumber'];
-            if (file_exists($chunkFile)) {
-                header('HTTP/1.0 200 Ok');
-            } else {
-                header('HTTP/1.0 404 Not Found');
-            }
-        }
-
-// loop through files and move the chunks to a temporarily created directory
-        if (!empty($_FILES)) {
-            foreach ($_FILES as $file) {
-                // check the error status
-                if ((int) $file['error'] !== 0) {
-                    $this->log('error '.$file['error'].' in file '.$_POST['resumableFilename']);
-                    continue;
-                }
-
-                // init the destination file (format <filename.ext>.part<#chunk>
-                // the file is stored in a temporary directory
-                if (isset($_POST['resumableIdentifier']) && '' !== trim($_POST['resumableIdentifier'])) {
-                    $tempDir = 'temp/'.$_POST['resumableIdentifier'];
-                }
-                $destFile = $tempDir.'/'.$_POST['resumableFilename'].'.part'.$_POST['resumableChunkNumber'];
-
-                // create the temporary directory
-                if (!is_dir($tempDir)) {
-                    mkdir($tempDir, 0777, true);
-                }
-
-                // move the temporary file
-                if (!move_uploaded_file($file['tmp_name'], $destFile)) {
-                    $this->log('Error saving (move_uploaded_file) chunk '.$_POST['resumableChunkNumber'].' for file '.$_POST['resumableFilename']);
-                } else {
-                    // check if all the parts present, and create the final destination file
-                    $this->createFileFromChunks($tempDir, $_POST['resumableFilename'], $_POST['resumableChunkSize'], $_POST['resumableTotalSize'], $_POST['resumableTotalChunks']);
-                }
-            }
-        }
-
-
-        return new JsonResponse('ok');
-
-
-
-
-
-
-
-
-
-
+        // Settings
+        $fs = new Filesystem();
         $fileManager = $this->newFileManager($request->query->all());
+        $targetDir = $fileManager->getCurrentPath().DIRECTORY_SEPARATOR;
 
-        $options = [
-            'upload_dir' => $fileManager->getCurrentPath().DIRECTORY_SEPARATOR,
-            'upload_url' => $fileManager->getImagePath(),
-            'accept_file_types' => $fileManager->getRegex(),
-            'print_response' => false,
-        ];
-        if (isset($fileManager->getConfiguration()['upload'])) {
-            $options += $fileManager->getConfiguration()['upload'];
-        }
-        $uploadHandler = new UploadHandler($options);
-        $response = $uploadHandler->response;
+        $chunk =  (int) ($_POST['chunk'] ?? 0);
+        $chunks = (int) ($_POST['chunks'] ?? 0);
 
-        return new JsonResponse('ok');
+        $fileName = $_POST['file'];
+        $filePath = rtrim($targetDir.$fileName.'/', '/\\');
+        $fileData = $this->decodeChunk($_POST['file_data']);
 
+        $fs->appendToFile("{$filePath}.part", $fileData);
 
-
-//        $fileManager = $this->newFileManager($request->query->all());
-//        $targetDir = sprintf('%s%s', $fileManager->getBasePath(), (isset($_REQUEST['identity']) ? DIRECTORY_SEPARATOR.$_REQUEST['identity'] : ''));
-        $targetDir = '/var/www/instances/fwebshop.home/web/uploads/test';
-
-        $cleanupTargetDir = false; // Remove old files
-        $maxFileAge = 5 * 3600; // Temp file age in seconds
-        // Create target dir
-        if (!file_exists($targetDir)) {
-            @mkdir($targetDir);
-        }
-        // Get a file name
-        if (isset($_REQUEST['name'])) {
-            $fileName = $_REQUEST['name'];
-        } elseif (!empty($_FILES)) {
-            $fileName = $_FILES['file']['name'];
-        } else {
-            $fileName = uniqid('file_');
-        }
-        $filePath = $targetDir.DIRECTORY_SEPARATOR.$fileName;
-        // Chunking might be enabled
-        $chunk = isset($_REQUEST['chunk']) ? (int) $_REQUEST['chunk'] : 0;
-        $chunks = isset($_REQUEST['chunks']) ? (int) $_REQUEST['chunks'] : 0;
-        // Remove old temp files
-        if ($cleanupTargetDir) {
-            if (!is_dir($targetDir) || !$dir = opendir($targetDir)) {
-                return new JsonResponse(['error'   => ['message' => 'Failed to open temp directory.', 'id' => 'id']], 100);
-            }
-            while (($file = readdir($dir)) !== false) {
-                $tmpfilePath = $targetDir.DIRECTORY_SEPARATOR.$file;
-                // If temp file is current file proceed to the next
-                if ("{$filePath}.part" === $tmpfilePath) {
-                    continue;
-                }
-                // Remove temp file if it is older than the max age and is not the current file
-                if (preg_match('/\.part$/', $file) && (filemtime($tmpfilePath) < time() - $maxFileAge)) {
-                    @unlink($tmpfilePath);
-                }
-            }
-            closedir($dir);
-        }
-        // Open temp file
-        if (!$out = fopen("{$filePath}.part", $chunks ? 'ab' : 'wb')) {
-            return new JsonResponse(['error'   => ['message' => 'Failed to open output stream.', 'id' => 'id']], 102);
-        }
-
-        if (!empty($_FILES)) {
-            if ($_FILES['file']['error'] || !is_uploaded_file($_FILES['file']['tmp_name'])) {
-                return new JsonResponse(['error'   => ['message' => 'Failed to move uploaded file.', 'id' => 'id']], 103);
-            }
-            // Read binary input stream and append it to temp file
-            if (!$in = fopen($_FILES['file']['tmp_name'], 'rb')) {
-                return new JsonResponse(['error'   => ['message' => 'Failed to open input stream.', 'id' => 'id']], 101);
-            }
-        } elseif (!empty($_REQUEST['file'])) {
-            // Read binary input stream and append it to temp file
-            if (!$in = fopen($_REQUEST['file'], 'rb')) {
-                return new JsonResponse(['error'   => ['message' => 'Failed to open input stream.', 'id' => 'id']], 101);
-            }
-        } elseif (!$in = fopen('php://input', 'rb')) {
-            return new JsonResponse(['error'   => ['message' => 'Failed to open input stream.', 'id' => 'id']], 101);
-        }
-
-        while ($buff = fread($in, 4096)) {
-            fwrite($out, $buff);
-        }
-        fclose($out);
-        fclose($in);
-        // Check if file has been uploaded
-        if (!$chunks || $chunk ===  $chunks - 1) {
-            // Strip the temp .part suffix off
-            rename("{$filePath}.part", $filePath);
+        if (!$chunks || $chunk === $chunks) {
+            $fs->rename("{$filePath}.part", $filePath);
 
             try {
-//                $moveToDir = $fileManager->getCurrentPath();
-                $zip = new \ZipArchive();
-//                $zippy = Zippy::load();
-                $res = $zip->open($filePath);
-                $extractDir = $targetDir.DIRECTORY_SEPARATOR.'tmp';
-                if (!file_exists($targetDir)) {
-                    @mkdir($targetDir);
+                $zippy = Zippy::load();
+                $extractDir = $targetDir.uniqid('tmp_'.$fileName, true);
+                if (!file_exists($extractDir)) {
+                    @mkdir($extractDir);
                 }
-//                $archive = $zippy->open($filePath);
-//                $archive->extract($targetDir);
-                $result = $zip->extractTo($targetDir);
-                $zip->close();
+                $archive = $zippy->open($filePath);
+                $archive->extract($extractDir);
+                $files = $this->moveContent($extractDir, $targetDir);
+                $fs->remove([$filePath, $extractDir]);
+                $this->dispatch(FileManagerEvents::POST_UPDATE, ['response' => ['files' => $files]]);
             } catch (\Exception $e) {
-                return new JsonResponse(['error'   => ['message' => 'Failed to open uploaded file.', 'id' => 'id']], 104);
+                return new JsonResponse(['status' => 201, 'message' => 'Failed to open uploaded file.']);
             }
+
+            return new JsonResponse(['status' => 200, 'message' => 'File uploaded successfully']);
         }
 
-        return new JsonResponse(['result' => null, 'id' => 'id']);
+        return new JsonResponse(['status' => 200, 'message' => 'Chunk uploaded']);
     }
 
 
@@ -563,17 +337,17 @@ class ManagerController extends Controller
     }
 
     /**
-     * @Route("/{_locale}/backend/file/manager/file/{fileName}", name="file_manager_file", defaults={"_locale": "en"}, options={"expose" = true})
+     * @Route("/{_locale}/backend/file/manager/download/file/", name="file_manager_file", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
-     * @param $fileName
      *
      * @return BinaryFileResponse
      *
      * @throws \Exception
      */
-    public function binaryFileResponseAction(Request $request, $fileName)
+    public function binaryFileResponseAction(Request $request)
     {
+        $fileName = 'honor-7x.jpg';
         $fileManager = $this->newFileManager($request->query->all());
 
         return new BinaryFileResponse($fileManager->getCurrentPath().DIRECTORY_SEPARATOR.urldecode($fileName));
@@ -583,6 +357,7 @@ class ManagerController extends Controller
      * @Route("/{_locale}/backend/file/manager/delete/", name="file_manager_delete", defaults={"_locale": "en"}, options={"expose" = true})
      *
      * @param Request $request
+     *
      * @Method("DELETE")
      *
      * @return \Symfony\Component\HttpFoundation\RedirectResponse
@@ -620,7 +395,7 @@ class ManagerController extends Controller
                         }
                     }
                 }
-                $this->dispatch(FileManagerEvents::POST_DELETE_FILE_DONE, $fileInfo);
+                $this->dispatch(FileManagerEvents::POST_DELETE_FILE_DONE);
                 if ($isDelete) {
                     $this->addFlash('success', 'file.deleted.success');
                 }
@@ -635,16 +410,54 @@ class ManagerController extends Controller
                 }
 
                 $this->dispatch(FileManagerEvents::POST_DELETE_FOLDER);
-                $queryParameters['route'] = dirname($fileManager->getCurrentRoute());
+                $queryParameters['route'] = \dirname($fileManager->getCurrentRoute());
                 if ($queryParameters['route'] = '/') {
                     unset($queryParameters['route']);
                 }
+                $this->dispatch(FileManagerEvents::POST_DELETE_FILE_DONE);
 
                 return $this->redirectToRoute('file_manager', $queryParameters);
             }
         }
 
         return $this->redirectToRoute('file_manager', $queryParameters);
+    }
+
+    /**
+     * @param string $eventName
+     * @param array  $arguments
+     */
+    protected function dispatch($eventName, array $arguments = [])
+    {
+        $arguments = array_replace([
+            'filemanager' => $this->fileManager,
+        ], $arguments);
+
+        $subject = $arguments['filemanager'];
+        $event = new GenericEvent($subject, $arguments);
+        $this->get('event_dispatcher')->dispatch($eventName, $event);
+    }
+
+    /**
+     * Decode chunk
+     * @param string|array $data
+     *
+     * @return array|bool|string
+     */
+    private function decodeChunk($data)
+    {
+        $data = explode(';base64,', $data);
+
+        if (!\is_array($data) || !isset($data[1])) {
+            return false;
+        }
+
+        $data = base64_decode($data[1]);
+        if (!$data) {
+            return false;
+        }
+
+        return $data;
     }
 
     /**
@@ -688,9 +501,9 @@ class ManagerController extends Controller
 
     /**
      * @param FileManager $fileManager
-     * @param $path
-     * @param string $parent
-     * @param bool   $baseFolderName
+     * @param string      $path
+     * @param string      $parent
+     * @param bool        $baseFolderName
      *
      * @return array|null
      */
@@ -737,8 +550,8 @@ class ManagerController extends Controller
     /**
      * Tree Iterator.
      *
-     * @param $path
-     * @param $regex
+     * @param string $path
+     * @param string $regex
      *
      * @return int
      */
@@ -750,8 +563,11 @@ class ManagerController extends Controller
         return iterator_count($files);
     }
 
-    /*
-     * Base Path
+    /**
+     * Get base path
+     * @param array $queryParameters
+     *
+     * @return mixed
      */
     private function getBasePath($queryParameters)
     {
@@ -780,7 +596,7 @@ class ManagerController extends Controller
     }
 
     /**
-     * @param $queryParameters
+     * @param array $queryParameters
      *
      * @return FileManager
      *
@@ -798,14 +614,43 @@ class ManagerController extends Controller
         return $this->fileManager;
     }
 
-    protected function dispatch($eventName, array $arguments = [])
+    /**
+     * Copy content from one location to another. If file exists on new location, rename file. Returns array of new files
+     * @param string $oldPath
+     * @param string $newPath
+     *
+     * @return array
+     */
+    private function moveContent($oldPath, $newPath)
     {
-        $arguments = array_replace([
-            'filemanager' => $this->fileManager,
-        ], $arguments);
+        $newFiles = [];
+        $newPath = rtrim($newPath, '/\\').DIRECTORY_SEPARATOR;
+        $fs = new Filesystem();
+        $files = (new Finder())->in($oldPath)->files();
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            $stdFile = new \stdClass();
+            $newDir = $newPath.$file->getRelativePath().DIRECTORY_SEPARATOR;
+            $fs->mkdir($newDir);
+            $fileName = $file->getFilename();
+            $newFilePath = $newDir.$fileName;
+            while ($fs->exists($newFilePath)) {
+                /** If file name contains multiple "." get element before extension and add unique part */
+                $tmpFileArray = explode('.', $fileName);
+                $fileName = & $tmpFileArray[\count($tmpFileArray) - 2];
+                $fileName .= uniqid('_', false);
+                unset($fileName);
+                $fileName = implode('.', $tmpFileArray);
+                $newFilePath = $newDir.$fileName;
+            }
+            $stdFile->name      = $fileName;
+            $stdFile->size      = $file->getSize();
+            $stdFile->location  = DIRECTORY_SEPARATOR.ltrim($file->getRelativePath(), '/\\');
+            $newFiles[] = $stdFile;
 
-        $subject = $arguments['filemanager'];
-        $event = new GenericEvent($subject, $arguments);
-        $this->get('event_dispatcher')->dispatch($eventName, $event);
+            $fs->copy($file->getPathname(), $newFilePath);
+        }
+
+        return $newFiles;
     }
 }

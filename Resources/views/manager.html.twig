@@ -7,7 +7,6 @@
 {% block customStylesheets %}
     <link rel="stylesheet" href="{{ asset('bundles/artgrisfilemanager/libs/blueimp-file-upload/css/jquery.fileupload.css') }}">
     <link rel="stylesheet" href="{{ asset('bundles/artgrisfilemanager/css/manager.css') }}">
-    <link href="https://transloadit.edgly.net/releases/uppy/v0.27.4/dist/uppy.min.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -38,11 +37,11 @@
                        accept="{{ fileManager.configuration.accept is defined ? fileManager.configuration.accept : (fileManager.type ? accept(fileManager.type)) }}">
             </span>
 
-            {#<span class="btn btn-success btn-sm fileinput-button btn-action">#}
-                {#<i class="glyphicon glyphicon-file"></i>#}
-                {#<span>{{ 'Add archive'|trans }}</span>#}
-                {#<a id="archiveupload" href="javascript:;">#}
-            {#</span>#}
+            <span class="btn btn-success btn-sm fileinput-button btn-action">
+                <i class="glyphicon glyphicon-file"></i>
+                <span>{{ 'Add archive'|trans }}</span>
+                <input id="archiveupload" type="file" accept=".zip">
+            </span>
 
             <button type="button" class="btn btn-primary btn-sm btn-action" data-toggle="modal" data-target="#addFolder">
                 <i class="glyphicon glyphicon-folder-open"></i>
@@ -90,8 +89,6 @@
                 {% else %}
                 <div class="col-lg-12">
                     {% endif %}
-                    <span id="archiveupload">UPLOAD</span>
-
                     <form id="form-multiple-delete">
                         {% include '@ArtgrisFileManager/views/_manager_view.html.twig' with {'fileManager' :fileManager,  'fileArray' : fileArray, 'formDelete' : formDelete} only %}
                     </form>
@@ -107,8 +104,6 @@
     <script src="{{ asset('bundles/artgrisfilemanager/libs/blueimp-file-upload/js/jquery.fileupload.js') }}"></script>
     <script src="{{ asset('bundles/artgrisfilemanager/libs/sticky-kit/jquery.sticky-kit.min.js') }}"></script>
     <script src="{{ asset('bundles/artgrisfilemanager/libs/remarkable-bootstrap-notify/dist/bootstrap-notify.min.js') }}"></script>
-    <script src="https://transloadit.edgly.net/releases/uppy/v0.27.4/dist/uppy.min.js"></script>
-
 
     <script>
         var treedata = {{ treeData|raw }};
@@ -313,91 +308,91 @@
             });
         }
 
-        var flow;
-
         $(document).ready(function () {
 
 
-            flow = new Flow({
-                target: '{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}',
-                chunkSize: 2000000
-            });
+            (function( $ ) {
+                let uploadArchiveEl = document.getElementById('archiveupload');
+                uploadArchiveEl.addEventListener('change', start_upload, false);
+                let reader = {};
+                let file = {};
+                let slice_size = 1000 * 1000 * 1024; // 10 MB
+                let fileUploadProgressBar;
+                var chunk, chunks = 1;
 
-            flow.assignBrowse(document.getElementById('archiveupload'));
 
-            flow.on('fileAdded', function(file, event){
-                console.log(file, event);
-            });
-            flow.on('fileSuccess', function(file, message){
-                console.log(file, message);
-            });
-            flow.on('fileError', function(file, message){
-                console.log(file, message);
-            });
+                function start_upload( event ) {
+                    event.preventDefault();
+                    chunk = chunks = 1;
 
-            {#generateIdentity = function () {#}
-                {#return 'tmp_' + (+ new Date()) + '_archive';#}
-            {#};#}
-            {#var uploader = new plupload.Uploader({#}
-                {#browse_button : 'archiveupload',#}
-                {#url : '{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}',#}
-                {#chunk_size : '20mb',#}
-                {#unique_names : true,#}
-                {#multiple_queues: false,#}
-                {#filters : {#}
-                    {#max_file_size : '1000mb',#}
-                    {#// Specify what files to browse for#}
-                    {#mime_types: [#}
-                        {#{title : "Zip files", extensions : "zip"}#}
-                    {#]#}
-                {#},#}
-                {#multipart_params: {#}
-                    {#identity: generateIdentity()#}
-                {#},#}
-                {#flash_swf_url : '../js/Moxie.swf',#}
-                {#silverlight_xap_url : '../js/Moxie.xap',#}
+                    reader = new FileReader();
+                    if (file = uploadArchiveEl.files[0]) {
+                        upload_file( 0 );
+                    } else {
+                        toastr.error(Translator.trans('Error while preparing for upload. Please try again.'))
+                    }
+                }
 
-                {#// Post init events, bound after the internal events#}
-                {#init : {#}
+                function upload_file( start ) {
+                    let next_slice = start + slice_size + 1;
+                    let blob = file.slice( start, next_slice );
 
-                    {#BeforeUpload: function(up, file) {#}
-                        {#// Called right before the upload for a given file starts, can be used to cancel it if required#}
-                    {#},#}
+                    reader.onloadend = function( event ) {
+                        if ( event.target.readyState !== FileReader.DONE ) {
+                            return;
+                        }
+                        chunks = Math.ceil( file.size / slice_size );
+                        // At this point the file data is loaded to event.target.result
+                        sendData(event.target.result, start, next_slice);
+                    };
 
-                    {#UploadProgress: function(up, file) {#}
-                        {#// Called while file is being uploaded#}
-                        {#window[file.uid].update('progress', Number.isInteger(file.percent) ? file.percent : 0);#}
-                    {#},#}
+                    reader.readAsDataURL( blob );
+                }
 
-                    {#FilesAdded: function(up, files) {#}
-                        {#// Called when files are added to queue#}
+                function sendData(data, start, next_slice) {
+                    if (0 === start) {
+                        fileUploadProgressBar = displayAlert('success', file.name, true);
+                    }
+                    $.ajax( {
+                        url: '{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}',
+                        type: 'POST',
+                        dataType: 'json',
+                        cache: false,
+                        data: {
+                            chunk: chunk,
+                            chunks: chunks,
+                            file_data: data,
+                            file: file.name,
+                            file_type: file.type
+                        },
+                        success: function( data ) {
+                            if (data.status === 200) {
+                                chunk++;
+                                var size_done = start + slice_size;
+                                var percent_done = Math.floor( ( size_done / file.size ) * 100 );
+                                if ( next_slice < file.size ) {
+                                    // Update upload progress
+                                    fileUploadProgressBar.update('progress', percent_done);
 
-                        {#plupload.each(files, function(file) {#}
-                            {#window[file.uid] = displayAlert('success', file.name, true);#}
-                        {#});#}
+                                    // More to upload, call function recursively
+                                    upload_file( next_slice );
+                                } else {
+                                    // Update upload progress
+                                    fileUploadProgressBar.update('progress', 100);
+                                    fileUploadProgressBar.close();
+                                    chunk = chunks = 1;
+                                }
+                            } else {
+                                chunk = chunks = 1;
+                                toastr.error(Translator.trans(data.message));
+                                fileUploadProgressBar.close();
+                            }
+                        }
+                    } );
+                }
 
-                        {#// Start files upload#}
-                        {#uploader.start();#}
-                    {#},#}
-
-                    {#FileUploaded: function(up, file, info) {#}
-                        {#// Called when file has finished uploading#}
-                        {#window[file.uid].close();#}
-                    {#},#}
-
-                    {#UploadComplete: function(up, files) {#}
-                        {#// Called when all files are either uploaded or failed#}
-                    {#},#}
-
-                    {#Error: function(up, args) {#}
-                        {#// Called when error occurs#}
-                    {#}#}
-                {#}#}
-            {#});#}
-
-            {#uploader.init();#}
+            })( jQuery );
         });
-
 
     </script>
     <script src="{{ asset('bundles/artgrisfilemanager/js/manager.js') }}"></script>
