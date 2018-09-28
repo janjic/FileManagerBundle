@@ -15,7 +15,7 @@
         </a>
     </div>
     {% set schemeAndHost = app.request.getSchemeAndHttpHost() %}
-    {% set route         = fileManager.queryParameters['route'] %}
+    {% set route         = fileManager.queryParameters['route'] is defined ? fileManager.queryParameters['route'] : '/' %}
     {% for fileEntity in fileArray %}
         {% set file = fileEntity.file %}
         <div class="{{ file.type }} col-xs-6 col-sm-4 col-md-{{ fileManager.tree == 0 ? 3 : 4 }} col-lg-2 text-center thumbnail">
@@ -67,6 +67,14 @@
                             class="btn btn-sm btn-default findEntityModalButton"
                             data-name='{{ file.filename }}'>
                     <span class="fa fa-code-fork"></span>
+                    </button>
+                </span>
+                <span data-toggle="tooltip" title="{{ 'Show connected entities'|trans }}">
+                    <button type="button"
+                            data-name='{{ file.filename }}'
+                            data-location="{{ route }}"
+                            class="btn btn-sm btn-default showConnectedEntitiesModalButton">
+                    <span class="fa fa-connectdevelop"></span>
                     </button>
                 </span>
                 {% if file.type == "file" %}

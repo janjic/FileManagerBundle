@@ -152,14 +152,56 @@
         {% endfor %}
 
 
-        var $connectModal           = $('#findEntityModal');
-        var $connectModalButton     = $('.findEntityModalButton');
-        var $entitySelect           = $('#entity');
-        var $entityField            = $('#entity-field');
-        var $entitySearchValue      = $('#search-value');
-        var locationPath            = getQueryParameterByName('route');
-        var classes, selectedClass,
+        var $connectedEntitiesModal         = $('#showConnectedEntitiesModal');
+        var $connectedEntitiesModalButton   = $('.showConnectedEntitiesModalButton');
+        var $connectModal                   = $('#findEntityModal');
+        var $connectModalButton             = $('.findEntityModalButton');
+        var $entitySelect                   = $('#entity');
+        var $entityField                    = $('#entity-field');
+        var $entitySearchValue              = $('#search-value');
+        var locationPath                    = getQueryParameterByName('route');
+        var classes,
+            selectedClass,
             selectedImage           = null;
+
+        $connectedEntitiesModalButton.on('click', function (event) {
+            event.preventDefault();
+            let location = $(this).data('location');
+            let img      = $(this).data('name');
+            function callbackFunction(ctx, data) {
+                if (data.status === 200) {
+                    if (data.rows.length) {
+                        let rows = [];
+                        data.rows.forEach(function (el) {
+                            let row     = document.createElement('tr');
+                            let entity  = document.createElement('td');
+                            entity.appendChild(document.createTextNode(el.type));
+                            let title   = document.createElement('td');
+                            title.appendChild(document.createTextNode(el.title));
+                            let actions = document.createElement('td');
+                            actions.appendChild(document.createTextNode(el.title));
+                            row.appendChild(entity);
+                            row.appendChild(title);
+                            row.appendChild(actions);
+                            rows.push(row);
+                        });
+                        let bodyContent = $connectedEntitiesModal.find('#connected-entities-content');
+                        rows.forEach(function (el) {
+                            bodyContent.append(el);
+                        });
+
+                        $connectedEntitiesModal.find('.modal-title').html(img);
+                        $connectedEntitiesModal.modal();
+                    } else {
+                        toastr.warning(Translator.trans(data.message));
+                    }
+                } else {
+                    toastr.error(Translator.trans(data.message));
+                }
+            }
+
+            adapter.sendData(Routing.generate('file_manager_find_related_entities', {_locale: getURLParameter('locale')}, true), { 'name': img, location: location }, 'POST', callbackFunction, this);
+        });
 
         $connectModalButton.on('click', function (event) {
             event.preventDefault();
@@ -183,6 +225,10 @@
             }
 
             adapter.getData(Routing.generate('file_manager_load_classes_json', {_locale: getURLParameter('locale')}, true), callbackFunction, "");
+        });
+
+        $connectedEntitiesModal.on('hidden.bs.modal', function () {
+            $connectedEntitiesModal.find('#connected-entities-content').empty();
         });
 
         $connectModal.on('hidden.bs.modal', function () {
@@ -310,7 +356,6 @@
 
         $(document).ready(function () {
 
-
             (function( $ ) {
                 let uploadArchiveEl = document.getElementById('archiveupload');
                 uploadArchiveEl.addEventListener('change', start_upload, false);
@@ -323,7 +368,8 @@
 
                 function start_upload( event ) {
                     event.preventDefault();
-                    chunk = chunks = 1;
+                    chunk = 1;
+                    chunks = Math.ceil( file.size / slice_size );
 
                     reader = new FileReader();
                     if (file = uploadArchiveEl.files[0]) {
@@ -341,8 +387,6 @@
                         if ( event.target.readyState !== FileReader.DONE ) {
                             return;
                         }
-                        chunks = Math.ceil( file.size / slice_size );
-                        // At this point the file data is loaded to event.target.result
                         sendData(event.target.result, start, next_slice);
                     };
 

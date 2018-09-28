@@ -8,7 +8,7 @@ $(function () {
         event.preventDefault();
         adapter.getData(Routing.generate('get_shipping_json', {_locale: getURLParameter('locale'), id: getURLParameter('id')}, true), callbackFunction, "");
 
-    })
+    });
 
     var callback = function (key, opt) {
         switch (key) {
@@ -46,10 +46,6 @@ $(function () {
             "edit": {name: renameMessage, icon: "fa-edit"},
         }
     });
-
-    function initiateConnectEntityModal() {
-
-    }
 
     function renameFile($renameModalButton) {
         $('#form_name').val($renameModalButton.data('name'));
