@@ -68,6 +68,10 @@
                     {{ order(fileManager, 'size') }}
                     {{ order(fileManager, 'dimension') }}
                 {% endif %}
+                <a type="button" id="clear-cache" href="#"
+                   class="btn btn-sm btn-default">
+                    <span class="fa fa-refresh"></span>
+                </a>
                 <a type="button" href="{{ path('file_manager', fileManager.queryParameters|merge({'view':"list", '_locale': locale})) }}"
                    class="btn btn-sm btn-default {{ fileManager.view == 'list' ? 'active' }}">
                     <span class="fa fa-th-list"></span>
@@ -155,6 +159,19 @@
         {% endfor %}
 
         $(document).ready(function () {
+            $('#clear-cache').on('click', function (event) {
+                event.preventDefault();
+                function successFunction(ctx, data) {
+                    if (data.status === 200) {
+                        toastr.success(Translator.trans(data.message));
+                    } else {
+                        toastr.error(Translator.trans(data.message));
+                    }
+                }
+                adapter.sendData(Routing.generate('file_manager_clear_cache_json', {_locale: getURLParameter('locale')}, true), {}, 'POST', successFunction, this);
+
+            });
+
             let createProgressBar = function(file) {
                 return displayAlert('success', file.name, true);
             };
