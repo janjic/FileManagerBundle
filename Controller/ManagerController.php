@@ -1,13 +1,12 @@
 <?php
 namespace Artgris\Bundle\FileManagerBundle\Controller;
 
-use Alchemy\Zippy\Zippy;
+use Alligator\Handler\Upload\FChunkFactory;
 use Artgris\Bundle\FileManagerBundle\Event\FileManagerEvents;
 use Artgris\Bundle\FileManagerBundle\Helpers\File;
 use Artgris\Bundle\FileManagerBundle\Helpers\FileManager;
 use Artgris\Bundle\FileManagerBundle\Helpers\UploadHandler;
 use Artgris\Bundle\FileManagerBundle\Twig\OrderExtension;
-use PHP_CodeSniffer\Tokenizers\JS;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
@@ -254,42 +253,15 @@ class ManagerController extends Controller
      */
     public function uploadArchiveFileAction(Request $request)
     {
-        // Settings
-        $fs = new Filesystem();
         $fileManager = $this->newFileManager($request->query->all());
         $targetDir = $fileManager->getCurrentPath().DIRECTORY_SEPARATOR;
 
-        $chunk =  (int) ($_POST['chunk'] ?? 0);
-        $chunks = (int) ($_POST['chunks'] ?? 0);
-
-        $fileName = $_POST['file'];
-        $filePath = rtrim($targetDir.$fileName.'/', '/\\');
-        $fileData = $this->decodeChunk($_POST['file_data']);
-
-        $fs->appendToFile("{$filePath}.part", $fileData);
-
-        if (!$chunks || $chunk === $chunks) {
-            $fs->rename("{$filePath}.part", $filePath);
-
-            try {
-                $zippy = Zippy::load();
-                $extractDir = $targetDir.uniqid('tmp_'.$fileName, true);
-                if (!file_exists($extractDir)) {
-                    @mkdir($extractDir);
-                }
-                $archive = $zippy->open($filePath);
-                $archive->extract($extractDir);
-                $files = $this->moveContent($extractDir, $targetDir);
-                $fs->remove([$filePath, $extractDir]);
-                $this->dispatch(FileManagerEvents::POST_UPDATE, ['response' => ['files' => $files]]);
-            } catch (\Exception $e) {
-                return new JsonResponse(['status' => 201, 'message' => 'Failed to open uploaded file.']);
-            }
-
-            return new JsonResponse(['status' => 200, 'message' => 'File uploaded successfully']);
+        $uploader = FChunkFactory::upload($request, $targetDir, true);
+        if ($uploader->getStatus() === 200) {
+            $this->dispatch(FileManagerEvents::POST_UPDATE, ['response' => ['files' => $uploader->getResult()]]);
         }
 
-        return new JsonResponse(['status' => 200, 'message' => 'Chunk uploaded']);
+        return new JsonResponse(['status' => $uploader->getStatus(), 'message' => $uploader->getMessage()]);
     }
 
 
@@ -612,45 +584,5 @@ class ManagerController extends Controller
         $this->fileManager = new FileManager($queryParameters, $this->getBasePath($queryParameters), $this->getKernelRoute(), $this->get('router'), $webDir);
 
         return $this->fileManager;
-    }
-
-    /**
-     * Copy content from one location to another. If file exists on new location, rename file. Returns array of new files
-     * @param string $oldPath
-     * @param string $newPath
-     *
-     * @return array
-     */
-    private function moveContent($oldPath, $newPath)
-    {
-        $newFiles = [];
-        $newPath = rtrim($newPath, '/\\').DIRECTORY_SEPARATOR;
-        $fs = new Filesystem();
-        $files = (new Finder())->in($oldPath)->files();
-        /** @var SplFileInfo $file */
-        foreach ($files as $file) {
-            $stdFile = new \stdClass();
-            $newDir = $newPath.$file->getRelativePath().DIRECTORY_SEPARATOR;
-            $fs->mkdir($newDir);
-            $fileName = $file->getFilename();
-            $newFilePath = $newDir.$fileName;
-            while ($fs->exists($newFilePath)) {
-                /** If file name contains multiple "." get element before extension and add unique part */
-                $tmpFileArray = explode('.', $fileName);
-                $fileName = & $tmpFileArray[\count($tmpFileArray) - 2];
-                $fileName .= uniqid('_', false);
-                unset($fileName);
-                $fileName = implode('.', $tmpFileArray);
-                $newFilePath = $newDir.$fileName;
-            }
-            $stdFile->name      = $fileName;
-            $stdFile->size      = $file->getSize();
-            $stdFile->location  = DIRECTORY_SEPARATOR.ltrim($file->getRelativePath(), '/\\');
-            $newFiles[] = $stdFile;
-
-            $fs->copy($file->getPathname(), $newFilePath);
-        }
-
-        return $newFiles;
     }
 }

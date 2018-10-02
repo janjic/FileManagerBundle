@@ -105,16 +105,19 @@
     <script src="{{ asset('bundles/artgrisfilemanager/libs/sticky-kit/jquery.sticky-kit.min.js') }}"></script>
     <script src="{{ asset('bundles/artgrisfilemanager/libs/remarkable-bootstrap-notify/dist/bootstrap-notify.min.js') }}"></script>
 
+
+    <script src="{{ asset('Resource/BackendTheme/js/fshop-chunk-upload.js') }}"></script>
+
     <script>
         var treedata = {{ treeData|raw }};
-        var tree = {{ fileManager.tree ? 'true' : 'false' }}
+        var tree = {{ fileManager.tree ? 'true' : 'false' }};
         var moduleName = '{{ fileManager.module ? fileManager.module : 0 }}';
         var successMessage = '{{ 'file.add.success'|trans }}';
-        var url = "{{ path('file_manager', fileManager.queryParameters|merge({'json':true, '_locale': locale}))|e('js') }}"
-        var urldelete = "{{ path('file_manager_delete', fileManager.queryParameters|merge({'_locale': locale}) )|e('js') }}"
-        var deleteMessage = "{{ 'title.delete'|trans }}"
-        var renameMessage = "{{ 'title.rename.file'|trans }}"
-        var downloadMessage = "{{ 'title.download'|trans }}"
+        var url = "{{ path('file_manager', fileManager.queryParameters|merge({'json':true, '_locale': locale}))|e('js') }}";
+        var urldelete = "{{ path('file_manager_delete', fileManager.queryParameters|merge({'_locale': locale}) )|e('js') }}";
+        var deleteMessage = "{{ 'title.delete'|trans }}";
+        var renameMessage = "{{ 'title.rename.file'|trans }}";
+        var downloadMessage = "{{ 'title.download'|trans }}";
     </script>
 
     <script>
@@ -147,297 +150,28 @@
         // display session flash messages
         {% for type, messages in app.flashes %}
         {% for message in messages %}
-        displayAlert('{{ type }}', '{{ message|trans|e('js') }}')
+        displayAlert('{{ type }}', '{{ message|trans|e('js') }}');
         {% endfor %}
         {% endfor %}
-
-
-        var $connectedEntitiesModal         = $('#showConnectedEntitiesModal');
-        var $connectedEntitiesModalButton   = $('.showConnectedEntitiesModalButton');
-        var $connectModal                   = $('#findEntityModal');
-        var $connectModalButton             = $('.findEntityModalButton');
-        var $entitySelect                   = $('#entity');
-        var $entityField                    = $('#entity-field');
-        var $entitySearchValue              = $('#search-value');
-        var locationPath                    = getQueryParameterByName('route');
-        var classes,
-            selectedClass,
-            selectedImage           = null;
-
-        $connectedEntitiesModalButton.on('click', function (event) {
-            event.preventDefault();
-            let location = $(this).data('location');
-            let img      = $(this).data('name');
-            function callbackFunction(ctx, data) {
-                if (data.status === 200) {
-                    if (data.rows.length) {
-                        let rows = [];
-                        data.rows.forEach(function (el) {
-                            let row     = document.createElement('tr');
-                            let entity  = document.createElement('td');
-                            entity.appendChild(document.createTextNode(el.type));
-                            let title   = document.createElement('td');
-                            title.appendChild(document.createTextNode(el.title));
-                            let actions = document.createElement('td');
-                            actions.appendChild(document.createTextNode(el.title));
-                            row.appendChild(entity);
-                            row.appendChild(title);
-                            row.appendChild(actions);
-                            rows.push(row);
-                        });
-                        let bodyContent = $connectedEntitiesModal.find('#connected-entities-content');
-                        rows.forEach(function (el) {
-                            bodyContent.append(el);
-                        });
-
-                        $connectedEntitiesModal.find('.modal-title').html(img);
-                        $connectedEntitiesModal.modal();
-                    } else {
-                        toastr.warning(Translator.trans(data.message));
-                    }
-                } else {
-                    toastr.error(Translator.trans(data.message));
-                }
-            }
-
-            adapter.sendData(Routing.generate('file_manager_find_related_entities', {_locale: getURLParameter('locale')}, true), { 'name': img, location: location }, 'POST', callbackFunction, this);
-        });
-
-        $connectModalButton.on('click', function (event) {
-            event.preventDefault();
-            selectedImage = $(this).data('name');
-            function callbackFunction(ctx, data) {
-                classes = data;
-                for (const [key, value] of Object.entries(classes)) {
-                    $entitySelect.append(new Option(value.name, key));
-                }
-                initializeEntitySelect();
-
-                $connectModal.modal();
-            }
-
-            /** Don't send request for loading classes if they are already loaded */
-            if (classes) {
-                initializeEntitySelect();
-                $connectModal.modal();
-
-                return;
-            }
-
-            adapter.getData(Routing.generate('file_manager_load_classes_json', {_locale: getURLParameter('locale')}, true), callbackFunction, "");
-        });
-
-        $connectedEntitiesModal.on('hidden.bs.modal', function () {
-            $connectedEntitiesModal.find('#connected-entities-content').empty();
-        });
-
-        $connectModal.on('hidden.bs.modal', function () {
-            selectedClass = selectedImage = null;
-            if ($entitySelect.data('select2')) {
-                $entitySelect.unbind('select2:select');
-                $entitySelect.select2('destroy');
-            }
-            if ($entityField.data('select2')) {
-                $entityField.empty();
-                $entityField.unbind('select2:select');
-                $entityField.select2('destroy');
-            }
-            if ($entitySearchValue.data('select2')) {
-                $entitySearchValue.empty();
-                $entitySearchValue.unbind('select2:select');
-                $entitySearchValue.select2('destroy');
-            }
-            hideSelects();
-        });
-
-        function hideSelects() {
-            $entityField.closest('.form-group').hide();
-            $entitySearchValue.closest('.form-group').hide();
-        }
-
-        function initializeEntitySelect() {
-            $entitySelect.val([]);
-            $entitySelect.select2({
-                dropdownParent: $("#findEntityModal"),
-                placeholder: Translator.trans('Select entity')
-            }).on('select2:select', function(element) {
-                let selected = element.params.data.id;
-                for (const [key, value] of Object.entries(classes)) {
-                    if (selected === key) {
-                        selectedClass = value;
-                        if ($entityField.data('select2')) {
-                            $entityField.select2('destroy');
-                        }
-                        $entityField.empty();
-
-                        value.mappedFields.forEach(function (el) {
-                            $entityField.append(new Option(el, el));
-                        });
-
-                        $entityField.val([]);
-                        $entityField.select2({
-                            dropdownParent: $("#findEntityModal"),
-                            placeholder: Translator.trans('Select field')
-                        }).on('select2:select', function () {
-                            initSearch();
-                            $entitySearchValue.closest('.form-group').show();
-                        });
-                        $entityField.closest('.form-group').show();
-
-                        return true;
-                    }
-                }
-            });
-        }
-
-
-        function initSearch() {
-            $entitySearchValue.select2({
-                dropdownParent: $("#findEntityModal"),
-                placeholder: Translator.trans('Search main entity'),
-                minimumInputLength: 1,
-                dataType: 'json',
-                ajax: {
-                    url: Routing.generate('file_manager_entity_search', {_locale: getURLParameter('locale') }, true),
-                    delay: 250,
-                    method: "POST",
-                    data: function (params) {
-                        return JSON.stringify({
-                            entity: selectedClass.path,
-                            fields: selectedClass.searchFields,
-                            view: selectedClass.viewField,
-                            query: params.term,
-                            page: params.page,
-                            offset: 10
-                        });
-                    },
-                    processResults: function (data, params) {
-                        params.page = params.page || 1;
-
-                        return {
-                            results: data.results,
-                            pagination: {
-                                more: true
-                            }
-                        };
-                    }
-                },
-                escapeMarkup: function (markup) {
-                    return markup;
-                },
-                templateResult: function (item) {
-                    if (item.loading) return Translator.trans('Loading') + '...';
-
-                    item.text = item.title;
-
-                    return '<div class="select2-result clearfix" data-id="' + item.id + '" data-title="' + item.id + '">' + item.title + '</div>';
-                }
-            }).on('select2:select', function(e) {
-                let element = e.params.data;
-                let obj = {
-                    entity: selectedClass.path,
-                    entityId: element.id,
-                    field: $entityField.val(),
-                    fileName: selectedImage,
-                    filePath: locationPath
-                };
-                function successFunction(ctx, data) {
-                    if (data.status === 200) {
-                        toastr.success(Translator.trans(data.message));
-                    } else {
-                        toastr.error(Translator.trans(data.message));
-                    }
-                    $connectModal.modal('hide');
-                }
-
-                adapter.sendData(Routing.generate('file_manager_assign_file_json', {_locale: getURLParameter('locale')}, true), obj, "POST", successFunction, $(this));
-            });
-        }
 
         $(document).ready(function () {
+            let createProgressBar = function(file) {
+                return displayAlert('success', file.name, true);
+            };
 
-            (function( $ ) {
-                let uploadArchiveEl = document.getElementById('archiveupload');
-                uploadArchiveEl.addEventListener('change', start_upload, false);
-                let reader = {};
-                let file = {};
-                let slice_size = 1000 * 1000 * 1024; // 10 MB
-                let fileUploadProgressBar;
-                var chunk, chunks = 1;
-
-
-                function start_upload( event ) {
-                    event.preventDefault();
-                    chunk = 1;
-                    chunks = Math.ceil( file.size / slice_size );
-
-                    reader = new FileReader();
-                    if (file = uploadArchiveEl.files[0]) {
-                        upload_file( 0 );
-                    } else {
-                        toastr.error(Translator.trans('Error while preparing for upload. Please try again.'))
-                    }
+            let chunkUploaded = function(data, numberOfChunk) {
+                if (data.status === 200) {
+                    window.location.reload();
                 }
+            };
 
-                function upload_file( start ) {
-                    let next_slice = start + slice_size + 1;
-                    let blob = file.slice( start, next_slice );
-
-                    reader.onloadend = function( event ) {
-                        if ( event.target.readyState !== FileReader.DONE ) {
-                            return;
-                        }
-                        sendData(event.target.result, start, next_slice);
-                    };
-
-                    reader.readAsDataURL( blob );
-                }
-
-                function sendData(data, start, next_slice) {
-                    if (0 === start) {
-                        fileUploadProgressBar = displayAlert('success', file.name, true);
-                    }
-                    $.ajax( {
-                        url: '{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}',
-                        type: 'POST',
-                        dataType: 'json',
-                        cache: false,
-                        data: {
-                            chunk: chunk,
-                            chunks: chunks,
-                            file_data: data,
-                            file: file.name,
-                            file_type: file.type
-                        },
-                        success: function( data ) {
-                            if (data.status === 200) {
-                                chunk++;
-                                var size_done = start + slice_size;
-                                var percent_done = Math.floor( ( size_done / file.size ) * 100 );
-                                if ( next_slice < file.size ) {
-                                    // Update upload progress
-                                    fileUploadProgressBar.update('progress', percent_done);
-
-                                    // More to upload, call function recursively
-                                    upload_file( next_slice );
-                                } else {
-                                    // Update upload progress
-                                    fileUploadProgressBar.update('progress', 100);
-                                    fileUploadProgressBar.close();
-                                    chunk = chunks = 1;
-                                }
-                            } else {
-                                chunk = chunks = 1;
-                                toastr.error(Translator.trans(data.message));
-                                fileUploadProgressBar.close();
-                            }
-                        }
-                    } );
-                }
-
-            })( jQuery );
+            $('#archiveupload').fshopChunkUpload({
+                end_point: '{{ path('file_manager_upload_archive', fileManager.queryParameters|merge({ '_locale': locale })) }}',
+                chunk_size: 5 * 1000 * 1024,
+                progress_bar: createProgressBar,
+                success_fn: chunkUploaded
+            });
         });
-
     </script>
     <script src="{{ asset('bundles/artgrisfilemanager/js/manager.js') }}"></script>
 {% endblock %}

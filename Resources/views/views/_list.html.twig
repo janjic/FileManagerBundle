@@ -63,22 +63,22 @@
                             <span class="fa fa-trash"></span>
                         </button>
                     </span>
-                    <span data-toggle="tooltip" title="{{ 'title.rename.file'|trans }}">
-                        <button type="button"
-                                class="btn btn-xs btn-default js-rename-modal"
-                                data-trigger="click"
-                                data-container="body"
-                                data-toggle="modal"
-                                data-target="#js-confirm-rename"
-                                data-placement="left"
-                                data-html="true"
-                                data-name='{{ file.basename('.'~file.extension) }}'
-                                data-old_name='{{ file.basename('.'~file.extension) }}'
-                                data-extension='{{ file.extension }}'
-                                data-href='{{ path('file_manager_rename', fileManager.queryParameters|merge({'_locale': locale})) }}'>
-                        <span class="fa fa-edit"></span>
-                        </button>
-                    </span>
+                    {#<span data-toggle="tooltip" title="{{ 'title.rename.file'|trans }}">#}
+                        {#<button type="button"#}
+                                {#class="btn btn-xs btn-default js-rename-modal"#}
+                                {#data-trigger="click"#}
+                                {#data-container="body"#}
+                                {#data-toggle="modal"#}
+                                {#data-target="#js-confirm-rename"#}
+                                {#data-placement="left"#}
+                                {#data-html="true"#}
+                                {#data-name='{{ file.basename('.'~file.extension) }}'#}
+                                {#data-old_name='{{ file.basename('.'~file.extension) }}'#}
+                                {#data-extension='{{ file.extension }}'#}
+                                {#data-href='{{ path('file_manager_rename', fileManager.queryParameters|merge({'_locale': locale})) }}'>#}
+                        {#<span class="fa fa-edit"></span>#}
+                        {#</button>#}
+                    {#</span>#}
                     <span data-toggle="tooltip" title="{{ 'Connect with entity'|trans }}">
                         <button type="button"
                                 data-name='{{ file.filename }}'
